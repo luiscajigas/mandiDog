@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/config.dart';
 import '../../core/theme/colores.dart';
+import '../../domain/repositories/analisis_repository.dart';
 import '../widgets/aviso_legal.dart';
 import '../widgets/logo_mandidog.dart';
 import '../widgets/tarjeta.dart';
@@ -13,6 +15,7 @@ class AcercaDeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
     final titulo = textos.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+    final enTelefono = !context.read<AnalisisRepository>().usaServidor;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Acerca de')),
@@ -48,7 +51,19 @@ class AcercaDeScreen extends StatelessWidget {
                 Text('¿Cómo funciona?', style: titulo),
                 const SizedBox(height: 14),
                 const _Paso(numero: 1, icono: Icons.photo_camera_rounded, titulo: 'Foto', texto: 'Tomas o eliges una foto de la boca de tu perro.'),
-                const _Paso(numero: 2, icono: Icons.cloud_upload_rounded, titulo: 'API', texto: 'La app envía la foto de forma segura al servidor.'),
+                enTelefono
+                    ? const _Paso(
+                        numero: 2,
+                        icono: Icons.phone_android_rounded,
+                        titulo: 'En tu teléfono',
+                        texto: 'La foto se analiza en el propio teléfono, sin internet. No sale de tu dispositivo.',
+                      )
+                    : const _Paso(
+                        numero: 2,
+                        icono: Icons.cloud_upload_rounded,
+                        titulo: 'API',
+                        texto: 'La app envía la foto de forma segura al servidor.',
+                      ),
                 const _Paso(numero: 3, icono: Icons.memory_rounded, titulo: 'Modelo', texto: 'Una red neuronal analiza la imagen y calcula una probabilidad.'),
                 const _Paso(numero: 4, icono: Icons.traffic_rounded, titulo: 'Semáforo', texto: 'Recibes un nivel verde, amarillo o rojo con una recomendación.', ultimo: true),
               ],

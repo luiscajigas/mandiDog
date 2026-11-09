@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: ^3.13.7
@@ -40,6 +40,8 @@ dependencies:
   google_fonts: ^8.0.0
   intl: ^0.20.3
   flutter_animate: ^4.5.2
+  flutter_litert: 3.9.4
+  crypto: ^3.0.6
   flutter_localizations:
     sdk: flutter
 
@@ -68,6 +70,8 @@ flutter:
   # Fuentes Poppins (licencia OFL) incluidas para no depender de internet.
   assets:
     - assets/google_fonts/
+    # Modelo entrenado (mandidog.tflite) y sus umbrales (modelo.json); ver ml/README.md.
+    - assets/modelo/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

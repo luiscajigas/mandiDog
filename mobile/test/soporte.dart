@@ -50,6 +50,9 @@ class AnalisisFalso implements AnalisisRepository {
   final EstadoServidor estado;
 
   @override
+  bool get usaServidor => true;
+
+  @override
   Future<ResultadoAnalisis> analizar(ImagenCapturada imagen) async => resultadoDePrueba(imagen: imagen.bytes);
 
   @override

@@ -4,7 +4,7 @@ Este documento describe la arquitectura del prototipo con el modelo C4 (Contexto
 
 ## Decisiones principales
 
-- **Cliente-servidor.** La app móvil captura la foto y presenta el resultado; la inferencia ocurre en el servidor. Así el modelo puede actualizarse sin publicar una nueva versión de la app y el teléfono no necesita cargar TensorFlow.
+- **Inferencia en el dispositivo, con la API como alternativa.** En Android el modelo se ejecuta en el teléfono con TensorFlow Lite: la app funciona sin internet ni servidor y la foto no sale del dispositivo. La versión web no puede ejecutar el modelo nativo, así que envía la foto a la API (cliente-servidor), que ejecuta el mismo modelo en Keras. Ambos caminos implementan el mismo contrato `AnalisisRepository` y aplican los mismos umbrales.
 - **La API es un monolito modular.** Un solo servicio desplegable, organizado internamente en capas con **puertos y adaptadores** (arquitectura hexagonal). El dominio no depende de FastAPI ni de TensorFlow.
 - **Sin estado en el servidor.** La API no guarda fotos ni resultados. El historial vive solo en el teléfono del propietario.
 - **Modo demostración.** Si no existe un modelo entrenado, la API sigue funcionando con un adaptador determinista y lo indica con `modo_demo: true`, para poder probar el flujo completo antes de tener datos suficientes.
@@ -34,7 +34,8 @@ Este documento describe la arquitectura del prototipo con el modelo C4 (Contexto
 
 | Contenedor | Tecnología | Responsabilidad |
 |------------|------------|-----------------|
-| **App móvil** | Flutter (Dart), Android y web | Captura con marco de encuadre, envío de la foto, presentación del semáforo, historial local. El mismo código se compila como APK y como aplicación web para iPhone |
+| **App móvil** | Flutter (Dart), Android y web | Captura con marco de encuadre, análisis en el teléfono (TensorFlow Lite) o envío a la API, presentación del semáforo, historial local. El mismo código se compila como APK y como aplicación web para iPhone |
+| **Modelo en el teléfono** | TensorFlow Lite (`flutter_litert`, LiteRT) | `assets/modelo/mandidog.tflite` y `modelo.json` (versión y umbrales), generados con `ml/exportar_tflite.py` |
 | **Almacenamiento local** | SharedPreferences (JSON; en web, almacenamiento local del navegador) | Historial de análisis con una miniatura de cada foto, solo en el dispositivo |
 | **API de análisis** | Python 3.11, FastAPI, Uvicorn, Docker | Validar la imagen, ejecutar la inferencia, traducir la probabilidad a nivel de riesgo |
 | **Modelo** | Archivo Keras (`mandidog_v1.keras`) | Red convolucional MobileNetV2 con clasificador binario |
@@ -43,7 +44,7 @@ Este documento describe la arquitectura del prototipo con el modelo C4 (Contexto
 **Comunicación**
 
 - La API puede servir también la versión web compilada (`WEB_DIR`), de modo que el navegador carga la app y llama a la API desde el mismo origen.
-- App → API: HTTP/JSON. `GET /health` para el indicador de estado y `POST /v1/analisis` (multipart) para analizar.
+- App → API (solo versión web o `ANALISIS_EN_SERVIDOR=true`): HTTP/JSON. `GET /health` para el indicador de estado y `POST /v1/analisis` (multipart) para analizar.
 - API → Modelo: carga del archivo en memoria al iniciar.
 - Entrenamiento → Modelo: genera el archivo que luego se copia en `api/models/` (o se monta como volumen en Docker).
 
@@ -82,9 +83,9 @@ Cambiar de motor de inferencia (por ejemplo, a TensorFlow Lite u ONNX) solo requ
 | Capa | Carpeta | Contenido |
 |------|---------|-----------|
 | Presentación | `presentation/` | Pantallas (bienvenida, inicio, captura, analizando, resultado, historial, acerca de), widgets (semáforo, marco de encuadre, aviso legal) y el controlador de tema |
-| Dominio | `domain/` | Entidades (`ResultadoAnalisis`, `NivelRiesgo`, `EstadoServidor`), errores y las interfaces `AnalisisRepository`, `HistorialRepository`, `PreferenciasRepository` |
-| Datos | `data/` | `MandiDogApiClient` (HTTP), `AnalisisRepositoryHttp`, `HistorialRepositoryLocal` (SharedPreferences), `PreferenciasRepositoryLocal`, `AlmacenImagenes` |
-| Composición | `main.dart` | Crea el cliente HTTP con `API_URL` y registra los repositorios con Provider |
+| Dominio | `domain/` | Entidades (`ResultadoAnalisis`, `NivelRiesgo`, `EstadoServidor`), el servicio `ClasificadorRiesgo` (umbrales y recomendaciones), errores y las interfaces `AnalisisRepository`, `HistorialRepository`, `PreferenciasRepository` |
+| Datos | `data/` | `AnalisisRepositoryLocal` con `MotorTflite` o `MotorDemo` (análisis en el teléfono), `MandiDogApiClient` y `AnalisisRepositoryHttp` (API), `HistorialRepositoryLocal` (SharedPreferences), `PreferenciasRepositoryLocal` |
+| Composición | `main.dart` | Elige el motor de análisis (TensorFlow Lite en Android, API en la web), carga el modelo o usa el modo demostración, y registra los repositorios con Provider |
 
 Las pantallas nunca usan `http` directamente: obtienen los repositorios con `context.read<...>()`. Esto permite probarlas con repositorios falsos.
 
@@ -113,7 +114,7 @@ Los detalles de clases y funciones están en el código fuente y sus pruebas:
 |----------|----------------|
 | Mantenibilidad | Puertos y adaptadores en la API; capas presentation/domain/data con repositorios en la app |
 | Facilidad de prueba | Inyección de dependencias en ambos lados; pruebas automáticas con adaptadores y repositorios falsos |
-| Privacidad | Las fotos no se guardan en el servidor; el historial solo existe en el teléfono |
+| Privacidad | En Android la foto se analiza en el teléfono y no se envía a ningún servidor; la API tampoco guarda fotos; el historial solo existe en el teléfono |
 | Robustez | Validación de imágenes, mensajes de error en español, la app nunca se cierra ante errores de red |
 | Portabilidad | API en contenedor Docker; app para Android y web; URL de la API configurable con `--dart-define` o desde la app |
 | Integración continua | GitHub Actions ejecuta pytest, flutter analyze y flutter test, y compila el APK |

@@ -8,7 +8,9 @@ Proyecto de grado — Ingeniería de Software, Universidad Cooperativa de Colomb
 
 ## Descripción
 
-El propietario de un perro toma o carga una foto de la boca del animal desde la app. La app la envía a una API, que la analiza con una red neuronal convolucional (clasificación binaria: *con signos visibles* o *sin signos visibles* de patología mandibular) y devuelve un nivel de riesgo:
+El propietario de un perro toma o carga una foto de la boca del animal desde la app. Una red neuronal convolucional la analiza (clasificación binaria: *con signos visibles* o *sin signos visibles* de patología mandibular) y la app muestra un nivel de riesgo.
+
+En **Android el análisis se hace dentro del teléfono** (TensorFlow Lite): no necesita internet, servidor ni computador encendido, y la foto no sale del dispositivo. La **versión web** (para iPhone) envía la foto a la API, que ejecuta el mismo modelo.
 
 | Nivel | Probabilidad de signos | Recomendación |
 |-------|------------------------|---------------|
@@ -16,7 +18,7 @@ El propietario de un perro toma o carga una foto de la boca del animal desde la 
 | 🟡 **AMARILLO** | entre 0.30 y 0.60 | Se observan posibles signos leves. Programa una revisión con tu veterinario. |
 | 🔴 **ROJO** | 0.60 o más | Se observan signos que requieren atención. Consulta a un veterinario lo antes posible. |
 
-Los umbrales se configuran en la API.
+Los umbrales se configuran en la API (`UMBRAL_AMARILLO`, `UMBRAL_ROJO`) y, para el análisis en el teléfono, en `mobile/assets/modelo/modelo.json`.
 
 ## Estructura del repositorio
 
@@ -29,19 +31,26 @@ docs/     Documentación (arquitectura y API)
 
 ## Arquitectura
 
-- **Cliente-servidor.** La app (Flutter) captura la foto y muestra el resultado; la API (FastAPI) valida la imagen y ejecuta el modelo.
+- **Dos motores de análisis intercambiables.** En Android, `AnalisisRepositoryLocal` ejecuta el modelo TensorFlow Lite en el teléfono, sin conexión. En la web, `AnalisisRepositoryHttp` envía la foto a la API (FastAPI), que valida la imagen y ejecuta el modelo. Ambos aplican los mismos umbrales y recomendaciones.
 - **La API es un monolito modular con puertos y adaptadores.** El dominio define el puerto `InferencePort`; los adaptadores `TensorFlowInferenceAdapter` (modelo real) y `DemoInferenceAdapter` (sin modelo) lo implementan. `app/main.py` es el único lugar donde se instancian y se inyectan con `Depends`.
 - **La app usa capas presentation / domain / data con el patrón repositorio.** Las pantallas solo conocen `AnalisisRepository` e `HistorialRepository`; `main.dart` crea las implementaciones y las registra con Provider.
 - **Sin estado en el servidor.** El historial se guarda solo en el teléfono.
 
 ```
-┌──────────────┐  POST /v1/analisis   ┌───────────────────────────┐        ┌──────────────────────┐
-│  App Flutter │ ───────────────────► │ API FastAPI               │ ─────► │ Modelo Keras         │
-│  (Android)   │ ◄─────────────────── │ servicio + InferencePort  │        │ MobileNetV2 binario  │
-└──────┬───────┘   nivel + aviso      └───────────────────────────┘        └──────────────────────┘
-       │ historial local (SharedPreferences)                                     ▲
-       ▼                                                                         │ ml/train.py
-  Teléfono del propietario                                                Dataset (no versionado)
+            Android (sin conexión)
+┌──────────────┐   ┌──────────────────────────┐
+│  App Flutter │──►│ Modelo TensorFlow Lite   │◄──────────────┐
+│  (APK)       │   │ assets/modelo/*.tflite   │               │ ml/exportar_tflite.py
+└──────┬───────┘   └──────────────────────────┘               │
+       │ historial local (SharedPreferences)          ┌───────┴──────────────┐
+       ▼                                              │ ml/train.py          │
+  Teléfono del propietario                            │ MobileNetV2 binario  │◄── Dataset (no versionado)
+                                                      └───────┬──────────────┘
+            Web / iPhone                                      │ .keras
+┌──────────────┐  POST /v1/analisis   ┌─────────────────────┐ ▼ ┌──────────────┐
+│  App web     │ ───────────────────► │ API FastAPI         │──►│ Modelo Keras │
+│  (Safari)    │ ◄─────────────────── │ InferencePort       │   └──────────────┘
+└──────────────┘   nivel + aviso      └─────────────────────┘
 ```
 
 Más detalle en [docs/arquitectura.md](docs/arquitectura.md) y [docs/api.md](docs/api.md).
@@ -81,14 +90,16 @@ Requiere Flutter 3.47+ y un emulador o teléfono Android.
 ```bash
 cd mobile
 flutter pub get
-flutter run --dart-define=API_URL=http://10.0.2.2:8000         # emulador de Android
-flutter run --dart-define=API_URL=http://192.168.1.50:8000     # teléfono en la misma red (IP del equipo con la API)
+flutter run                                                     # análisis dentro del teléfono (sin servidor)
+flutter run --dart-define=ANALISIS_EN_SERVIDOR=true --dart-define=API_URL=http://192.168.1.50:8000   # usar la API
 ```
+
+El modelo que usa la app está en `mobile/assets/modelo/` (`mandidog.tflite` y `modelo.json`); se genera con `ml/train.py` o `ml/exportar_tflite.py`. Si la carpeta no tiene modelo, la app funciona en **modo demostración**.
 
 - Análisis estático: `flutter analyze`
 - Pruebas: `flutter test`
 
-La dirección del servidor también se puede cambiar desde la app: **Inicio → ícono de servidor**.
+Cuando la app usa la API (versión web o `ANALISIS_EN_SERVIDOR=true`), la dirección del servidor se puede cambiar desde **Inicio → ícono de servidor**.
 
 ### Instalar el APK sin Android Studio
 
@@ -97,7 +108,7 @@ Cada vez que se suben cambios a `main` o `develop`, GitHub Actions ejecuta las p
 1. En GitHub, abra la pestaña **Actions** → flujo **App Android (APK) y web** → la ejecución más reciente.
 2. Descargue el artefacto **mandidog-apk** (un .zip con `app-release.apk`).
 3. Copie el APK al teléfono Android, ábralo y permita instalar apps de origen desconocido.
-4. En la app, toque el ícono de servidor y escriba la dirección de la API (por ejemplo `http://192.168.1.7:8000`).
+4. Abra MandiDog IA y analice una foto. No necesita internet ni un computador encendido.
 
 #### Versiones publicadas (Releases)
 
@@ -147,6 +158,7 @@ El script produce `metrics.json` con exactitud, precisión, sensibilidad, especi
 
 **Incluye**
 
+- Análisis dentro del teléfono con TensorFlow Lite, sin internet ni servidor.
 - Versión web de la misma app, usable desde el navegador de un iPhone.
 - Compilación automática del APK y pruebas en GitHub Actions.
 - App Android con bienvenida, inicio, captura con marco de encuadre, análisis, resultado con semáforo, historial local, acerca de y tema oscuro.
