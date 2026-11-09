@@ -1,30 +1,27 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/resultado_analisis.dart';
 import '../../domain/repositories/historial_repository.dart';
 
-/// Copia la foto a un lugar permanente y devuelve la nueva ruta.
-typedef PersistirImagen = Future<String?> Function(String rutaOriginal, String id);
+/// Convierte la foto original en una miniatura para guardarla.
+typedef ReducirImagen = Future<Uint8List?> Function(Uint8List original);
 
-/// Borra las fotos guardadas del historial.
-typedef BorrarImagenes = Future<void> Function(List<String> rutas);
-
-/// Historial guardado en el dispositivo como una lista JSON dentro de SharedPreferences.
+/// Historial guardado en el dispositivo como una lista JSON dentro de SharedPreferences
+/// (en el navegador, SharedPreferences usa el almacenamiento local de la página).
 class HistorialRepositoryLocal implements HistorialRepository {
   HistorialRepositoryLocal(
     this._prefs, {
-    this._persistirImagen,
-    this._borrarImagenes,
-    this.maximoRegistros = 100,
+    this._reducirImagen,
+    this.maximoRegistros = 30,
   });
 
-  static const clave = 'historial_analisis_v1';
+  static const clave = 'historial_analisis_v2';
 
   final SharedPreferences _prefs;
-  final PersistirImagen? _persistirImagen;
-  final BorrarImagenes? _borrarImagenes;
+  final ReducirImagen? _reducirImagen;
   final int maximoRegistros;
 
   @override
@@ -51,23 +48,28 @@ class HistorialRepositoryLocal implements HistorialRepository {
   @override
   Future<ResultadoAnalisis> guardar(ResultadoAnalisis resultado) async {
     var aGuardar = resultado;
-    final ruta = resultado.imagenPath;
-    if (ruta != null && _persistirImagen != null) {
-      final definitiva = await _persistirImagen(ruta, resultado.id);
-      if (definitiva != null) aGuardar = resultado.copyWith(imagenPath: definitiva);
+    final imagen = resultado.imagen;
+    final reducir = _reducirImagen;
+    if (imagen != null && reducir != null) {
+      final miniatura = await reducir(imagen);
+      aGuardar = miniatura == null ? resultado.copyWith(quitarImagen: true) : resultado.copyWith(imagen: miniatura);
     }
 
     final actuales = await obtenerTodos();
-    final lista = [aGuardar, ...actuales.where((r) => r.id != aGuardar.id)].take(maximoRegistros);
-    await _prefs.setString(clave, jsonEncode(lista.map((r) => r.toJson()).toList()));
-    return aGuardar;
+    var lista = [aGuardar, ...actuales.where((r) => r.id != aGuardar.id)].take(maximoRegistros).toList();
+
+    // Si el almacenamiento se llena (por ejemplo, el límite del navegador), se descartan los más antiguos.
+    while (true) {
+      try {
+        await _prefs.setString(clave, jsonEncode(lista.map((r) => r.toJson()).toList()));
+        return aGuardar;
+      } on Object {
+        if (lista.length <= 1) return aGuardar;
+        lista = lista.take(lista.length ~/ 2).toList();
+      }
+    }
   }
 
   @override
-  Future<void> borrarTodo() async {
-    final actuales = await obtenerTodos();
-    final rutas = actuales.map((r) => r.imagenPath).whereType<String>().toList();
-    await _prefs.remove(clave);
-    if (_borrarImagenes != null && rutas.isNotEmpty) await _borrarImagenes(rutas);
-  }
+  Future<void> borrarTodo() => _prefs.remove(clave);
 }

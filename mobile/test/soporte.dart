@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mandidog/core/theme/tema.dart';
 import 'package:mandidog/domain/entities/estado_servidor.dart';
+import 'package:mandidog/domain/entities/imagen_capturada.dart';
 import 'package:mandidog/domain/entities/nivel_riesgo.dart';
 import 'package:mandidog/domain/entities/resultado_analisis.dart';
 import 'package:mandidog/domain/repositories/analisis_repository.dart';
@@ -31,6 +34,14 @@ class PreferenciasFalsas implements PreferenciasRepository {
 
   @override
   Future<void> guardarTemaOscuro(bool valor) async => _oscuro = valor;
+
+  String? _url;
+
+  @override
+  String? get urlServidor => _url;
+
+  @override
+  Future<void> guardarUrlServidor(String? url) async => _url = url;
 }
 
 class AnalisisFalso implements AnalisisRepository {
@@ -39,7 +50,7 @@ class AnalisisFalso implements AnalisisRepository {
   final EstadoServidor estado;
 
   @override
-  Future<ResultadoAnalisis> analizar(String imagenPath) async => resultadoDePrueba(imagenPath: imagenPath);
+  Future<ResultadoAnalisis> analizar(ImagenCapturada imagen) async => resultadoDePrueba(imagen: imagen.bytes);
 
   @override
   Future<EstadoServidor> consultarEstado() async => estado;
@@ -67,7 +78,7 @@ ResultadoAnalisis resultadoDePrueba({
   double probabilidad = 0.42,
   bool modoDemo = true,
   DateTime? fecha,
-  String? imagenPath,
+  Uint8List? imagen,
 }) {
   return ResultadoAnalisis(
     id: id,
@@ -78,7 +89,7 @@ ResultadoAnalisis resultadoDePrueba({
     versionModelo: 'demo-sin-entrenar',
     modoDemo: modoDemo,
     fecha: fecha ?? DateTime(2026, 3, 14, 10, 30),
-    imagenPath: imagenPath,
+    imagen: imagen,
   );
 }
 

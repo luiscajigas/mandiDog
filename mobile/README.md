@@ -1,6 +1,6 @@
 # App móvil de MandiDog IA (Flutter)
 
-Aplicación Android que permite al propietario fotografiar la boca de su perro, enviarla a la API de análisis y ver el resultado como un semáforo (VERDE, AMARILLO o ROJO).
+Aplicación Android (también compilable para web) que permite al propietario fotografiar la boca de su perro, enviarla a la API de análisis y ver el resultado como un semáforo (VERDE, AMARILLO o ROJO).
 
 ## Requisitos
 
@@ -21,7 +21,19 @@ flutter run
 flutter run --dart-define=API_URL=http://192.168.1.50:8000
 ```
 
-Por defecto la app usa `http://10.0.2.2:8000`, la dirección con la que el emulador de Android ve al equipo anfitrión.
+Por defecto la app usa `http://10.0.2.2:8000`, la dirección con la que el emulador de Android ve al equipo anfitrión. El usuario puede cambiarla desde **Inicio → ícono de servidor**; la elección se guarda en el teléfono.
+
+### Versión web
+
+```bash
+flutter build web --release      # genera build/web
+```
+
+La API puede servir esa carpeta con `WEB_DIR=../mobile/build/web` (ver el README principal). En web, la app usa como servidor el mismo origen desde el que se abrió la página, y la cámara se abre con la app de cámara del teléfono.
+
+### Íconos
+
+Los íconos de Android y web se generan con `python tool/generar_iconos.py` (requiere Pillow).
 
 ## Pruebas y análisis estático
 

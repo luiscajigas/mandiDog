@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/config.dart';
 import '../../core/navegacion/rutas.dart';
 import '../../core/theme/colores.dart';
 import '../../domain/entities/estado_servidor.dart';
 import '../../domain/repositories/analisis_repository.dart';
+import '../../domain/repositories/preferencias_repository.dart';
 import '../state/controlador_tema.dart';
 import '../widgets/logo_mandidog.dart';
 import '../widgets/tarjeta.dart';
@@ -35,6 +37,19 @@ class _InicioScreenState extends State<InicioScreen> {
     await consulta;
   }
 
+  Future<void> _configurarServidor() async {
+    final preferencias = context.read<PreferenciasRepository>();
+    final actual = preferencias.urlServidor ?? ConfiguracionApp.urlPorDefecto;
+    final nueva = await showDialog<String>(
+      context: context,
+      builder: (_) => _DialogoServidor(urlActual: actual),
+    );
+    if (nueva == null || !mounted) return;
+    await preferencias.guardarUrlServidor(nueva == _DialogoServidor.restablecer ? null : nueva);
+    if (!mounted) return;
+    await _actualizarEstado();
+  }
+
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
@@ -56,6 +71,11 @@ class _InicioScreenState extends State<InicioScreen> {
             onPressed: tema.alternar,
           ),
           IconButton(
+            tooltip: 'Servidor',
+            icon: const Icon(Icons.dns_rounded),
+            onPressed: _configurarServidor,
+          ),
+          IconButton(
             tooltip: 'Acerca de',
             icon: const Icon(Icons.info_outline_rounded),
             onPressed: () => Navigator.of(context).push(rutaAnimada(const AcercaDeScreen())),
@@ -71,7 +91,7 @@ class _InicioScreenState extends State<InicioScreen> {
             const SizedBox(height: 4),
             Text('¿Cómo está la boca de tu perro hoy?', style: textos.bodyLarge),
             const SizedBox(height: 14),
-            _IndicadorServidor(estado: _estado, onReintentar: _actualizarEstado),
+            _IndicadorServidor(estado: _estado, onReintentar: _actualizarEstado, onConfigurar: _configurarServidor),
             const SizedBox(height: 20),
             const _TarjetaAnalizar(),
             const SizedBox(height: 16),
@@ -168,10 +188,11 @@ class _TarjetaAnalizar extends StatelessWidget {
 }
 
 class _IndicadorServidor extends StatelessWidget {
-  const _IndicadorServidor({required this.estado, required this.onReintentar});
+  const _IndicadorServidor({required this.estado, required this.onReintentar, required this.onConfigurar});
 
   final Future<EstadoServidor> estado;
   final Future<void> Function() onReintentar;
+  final VoidCallback onConfigurar;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +215,11 @@ class _IndicadorServidor extends StatelessWidget {
                 onPressed: onReintentar,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Reintentar'),
+              ),
+              TextButton.icon(
+                onPressed: onConfigurar,
+                icon: const Icon(Icons.dns_rounded, size: 18),
+                label: const Text('Configurar'),
               ),
             ],
           );
@@ -346,6 +372,78 @@ class _TarjetaConsejosState extends State<_TarjetaConsejos> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DialogoServidor extends StatefulWidget {
+  const _DialogoServidor({required this.urlActual});
+
+  /// Valor especial que indica volver a la dirección predeterminada.
+  static const restablecer = '__predeterminada__';
+
+  final String urlActual;
+
+  @override
+  State<_DialogoServidor> createState() => _DialogoServidorState();
+}
+
+class _DialogoServidorState extends State<_DialogoServidor> {
+  late final TextEditingController _texto = TextEditingController(text: widget.urlActual);
+  String? _error;
+
+  @override
+  void dispose() {
+    _texto.dispose();
+    super.dispose();
+  }
+
+  void _guardar() {
+    final url = ConfiguracionApp.normalizarUrl(_texto.text);
+    if (url == null) {
+      setState(() => _error = 'Escribe una dirección válida, por ejemplo http://192.168.1.7:8000');
+      return;
+    }
+    Navigator.pop(context, url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.dns_rounded),
+      title: const Text('Servidor de análisis'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Dirección de la API de MandiDog IA. Si usas un teléfono, escribe la IP del computador donde corre la API.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _texto,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: 'Dirección',
+              hintText: 'http://192.168.1.7:8000',
+              errorText: _error,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onSubmitted: (_) => _guardar(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, _DialogoServidor.restablecer),
+          child: const Text('Restablecer'),
+        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: _guardar,
+          child: const Text('Guardar'),
+        ),
+      ],
     );
   }
 }

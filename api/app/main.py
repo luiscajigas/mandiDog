@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.config import Settings, obtener_settings
@@ -70,6 +71,16 @@ def crear_app(settings: Settings | None = None, motor: InferencePort | None = No
         return JSONResponse(status_code=422, content={"detalle": mensaje})
 
     app.include_router(router)
+
+    # Versión web de la app (opcional). Se monta al final para no tapar los endpoints de la API.
+    if settings.web_dir:
+        carpeta_web = Path(settings.web_dir)
+        if (carpeta_web / "index.html").is_file():
+            app.mount("/", StaticFiles(directory=carpeta_web, html=True), name="web")
+            logger.info("Sirviendo la versión web desde %s", carpeta_web)
+        else:
+            logger.warning("WEB_DIR=%s no contiene index.html; no se servirá la versión web.", carpeta_web)
+
     return app
 
 

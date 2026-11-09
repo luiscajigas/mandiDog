@@ -1,16 +1,17 @@
-import 'dart:io';
-
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/navegacion/rutas.dart';
 import '../../core/theme/colores.dart';
+import '../../domain/entities/imagen_capturada.dart';
 import '../widgets/marco_encuadre.dart';
 import 'analizando_screen.dart';
 
-enum _EstadoCamara { iniciando, lista, sinCamara, permisoDenegado }
+/// En el navegador la cámara se abre con la app nativa del teléfono (no requiere HTTPS).
+enum _EstadoCamara { iniciando, lista, sinCamara, permisoDenegado, web }
 
 /// Captura de la foto: vista previa con marco de encuadre, galería y confirmación.
 class CapturaScreen extends StatefulWidget {
@@ -23,8 +24,8 @@ class CapturaScreen extends StatefulWidget {
 class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserver {
   final _selector = ImagePicker();
   CameraController? _camara;
-  _EstadoCamara _estado = _EstadoCamara.iniciando;
-  String? _fotoPath;
+  _EstadoCamara _estado = kIsWeb ? _EstadoCamara.web : _EstadoCamara.iniciando;
+  ImagenCapturada? _foto;
   bool _ocupado = false;
   FlashMode _flash = FlashMode.off;
 
@@ -32,7 +33,7 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _iniciarCamara();
+    if (!kIsWeb) _iniciarCamara();
   }
 
   @override
@@ -50,12 +51,13 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
       _camara = null;
       camara.dispose();
       if (mounted) setState(() => _estado = _EstadoCamara.iniciando);
-    } else if (estado == AppLifecycleState.resumed && _fotoPath == null) {
+    } else if (estado == AppLifecycleState.resumed && _foto == null) {
       _iniciarCamara();
     }
   }
 
   Future<void> _iniciarCamara() async {
+    if (kIsWeb) return;
     setState(() => _estado = _EstadoCamara.iniciando);
     try {
       final camaras = await availableCameras();
@@ -94,12 +96,14 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
   }
 
   Future<void> _tomarFoto() async {
+    if (kIsWeb) return _elegir(ImageSource.camera);
     final camara = _camara;
     if (camara == null || !camara.value.isInitialized || camara.value.isTakingPicture || _ocupado) return;
     setState(() => _ocupado = true);
     try {
-      final foto = await camara.takePicture();
-      if (mounted) setState(() => _fotoPath = foto.path);
+      final archivo = await camara.takePicture();
+      final foto = ImagenCapturada(bytes: await archivo.readAsBytes(), nombre: archivo.name);
+      if (mounted) setState(() => _foto = foto);
     } on Object {
       _mostrarMensaje('No pudimos tomar la foto. Inténtalo de nuevo.');
     } finally {
@@ -107,19 +111,24 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
     }
   }
 
-  Future<void> _elegirDeGaleria() async {
+  Future<void> _elegir(ImageSource origen) async {
     if (_ocupado) return;
     setState(() => _ocupado = true);
     try {
-      final foto = await _selector.pickImage(
-        source: ImageSource.gallery,
+      final archivo = await _selector.pickImage(
+        source: origen,
         maxWidth: 1920,
         maxHeight: 1920,
         imageQuality: 90,
       );
-      if (foto != null && mounted) setState(() => _fotoPath = foto.path);
+      if (archivo != null) {
+        final foto = ImagenCapturada(bytes: await archivo.readAsBytes(), nombre: archivo.name);
+        if (mounted) setState(() => _foto = foto);
+      }
     } on Object {
-      _mostrarMensaje('No pudimos abrir la galería. Revisa los permisos de la app.');
+      _mostrarMensaje(origen == ImageSource.camera
+          ? 'No pudimos abrir la cámara. Revisa los permisos del navegador o elige una foto de la galería.'
+          : 'No pudimos abrir la galería. Revisa los permisos de la app.');
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }
@@ -136,14 +145,14 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
   }
 
   void _repetir() {
-    setState(() => _fotoPath = null);
-    if (_camara == null) _iniciarCamara();
+    setState(() => _foto = null);
+    if (_camara == null && !kIsWeb) _iniciarCamara();
   }
 
   void _analizar() {
-    final ruta = _fotoPath;
-    if (ruta == null) return;
-    Navigator.of(context).pushReplacement(rutaAnimada(AnalizandoScreen(imagenPath: ruta)));
+    final foto = _foto;
+    if (foto == null) return;
+    Navigator.of(context).pushReplacement(rutaAnimada(AnalizandoScreen(imagen: foto)));
   }
 
   void _mostrarMensaje(String texto) {
@@ -151,16 +160,18 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
   }
 
+  bool get _puedeDisparar => _estado == _EstadoCamara.lista || _estado == _EstadoCamara.web;
+
   @override
   Widget build(BuildContext context) {
+    final foto = _foto;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         foregroundColor: Colors.white,
-        title: Text(_fotoPath == null ? 'Toma la foto' : 'Revisa la foto',
-            style: const TextStyle(color: Colors.white)),
+        title: Text(foto == null ? 'Toma la foto' : 'Revisa la foto', style: const TextStyle(color: Colors.white)),
         actions: [
-          if (_fotoPath == null && _estado == _EstadoCamara.lista)
+          if (foto == null && _estado == _EstadoCamara.lista)
             IconButton(
               tooltip: _flash == FlashMode.off ? 'Encender linterna' : 'Apagar linterna',
               icon: Icon(_flash == FlashMode.off ? Icons.flash_off_rounded : Icons.flash_on_rounded),
@@ -171,7 +182,7 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
       extendBodyBehindAppBar: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
-        child: _fotoPath == null ? _vistaCamara() : _vistaConfirmacion(_fotoPath!),
+        child: foto == null ? _vistaCamara() : _vistaConfirmacion(foto),
       ),
     );
   }
@@ -185,7 +196,7 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
             fit: StackFit.expand,
             children: [
               _previsualizacion(),
-              if (_estado == _EstadoCamara.lista) const MarcoEncuadre(),
+              if (_estado == _EstadoCamara.lista || _estado == _EstadoCamara.web) const MarcoEncuadre(),
             ],
           ),
         ),
@@ -199,12 +210,14 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
     switch (_estado) {
       case _EstadoCamara.iniciando:
         return const Center(child: CircularProgressIndicator(color: Colors.white));
+      case _EstadoCamara.web:
+        return const _FondoGuiaWeb();
       case _EstadoCamara.sinCamara:
       case _EstadoCamara.permisoDenegado:
         return _AvisoCamara(
           permisoDenegado: _estado == _EstadoCamara.permisoDenegado,
           onReintentar: _iniciarCamara,
-          onGaleria: _elegirDeGaleria,
+          onGaleria: () => _elegir(ImageSource.gallery),
         );
       case _EstadoCamara.lista:
         if (camara == null || !camara.value.isInitialized) {
@@ -232,13 +245,13 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
             _BotonRedondo(
               icono: Icons.photo_library_rounded,
               etiqueta: 'Galería',
-              onPressed: _ocupado ? null : _elegirDeGaleria,
+              onPressed: _ocupado ? null : () => _elegir(ImageSource.gallery),
             ),
             Semantics(
               button: true,
               label: 'Tomar foto',
               child: GestureDetector(
-                onTap: _estado == _EstadoCamara.lista ? _tomarFoto : null,
+                onTap: _puedeDisparar ? _tomarFoto : null,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 82,
@@ -251,30 +264,31 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _estado == _EstadoCamara.lista
-                          ? (_ocupado ? Colors.white54 : ColoresMandiDog.coral)
-                          : Colors.white24,
+                      color: _puedeDisparar ? (_ocupado ? Colors.white54 : ColoresMandiDog.coral) : Colors.white24,
                     ),
                     child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 32),
                   ),
                 ),
               ),
             ),
-            _BotonRedondo(
-              icono: Icons.refresh_rounded,
-              etiqueta: 'Reiniciar',
-              onPressed: _ocupado ? null : _iniciarCamara,
-            ),
+            if (kIsWeb)
+              const SizedBox(width: 56)
+            else
+              _BotonRedondo(
+                icono: Icons.refresh_rounded,
+                etiqueta: 'Reiniciar',
+                onPressed: _ocupado ? null : _iniciarCamara,
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _vistaConfirmacion(String ruta) {
+  Widget _vistaConfirmacion(ImagenCapturada foto) {
     final textos = Theme.of(context).textTheme;
     return SafeArea(
-      key: ValueKey(ruta),
+      key: ObjectKey(foto),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 20),
         child: Column(
@@ -282,11 +296,18 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.file(
-                  File(ruta),
+                child: Image.memory(
+                  foto.bytes,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => const Center(
-                    child: Text('No pudimos mostrar la foto', style: TextStyle(color: Colors.white)),
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No pudimos mostrar la foto. Si viene de un iPhone, intenta tomarla de nuevo desde la app.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ),
                 ),
               ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.96, 0.96)),
@@ -325,6 +346,50 @@ class _CapturaScreenState extends State<CapturaScreen> with WidgetsBindingObserv
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Fondo de la versión web: explica cómo encuadrar antes de abrir la cámara del teléfono.
+class _FondoGuiaWeb extends StatelessWidget {
+  const _FondoGuiaWeb();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, restricciones) {
+        final marco = MarcoEncuadre.rectanguloPara(Size(restricciones.maxWidth, restricciones.maxHeight));
+        return Stack(
+          children: [
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [ColoresMandiDog.petroleo, Color(0xFF07262E)],
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fromRect(
+              rect: marco.deflate(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.pets_rounded, color: Colors.white54, size: 56),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Pulsa el botón para abrir la cámara.\nLevanta suavemente el labio para que se vean las encías y los dientes.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

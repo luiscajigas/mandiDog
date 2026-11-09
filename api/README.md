@@ -56,5 +56,6 @@ pytest
 | `UMBRAL_ROJO`     | `0.60`                      | Probabilidad mínima para el nivel ROJO           |
 | `MAX_TAMANO_MB`   | `10`                        | Tamaño máximo de la imagen                       |
 | `CORS_ORIGINS`    | `*`                         | Orígenes permitidos, separados por coma          |
+| `WEB_DIR`         | (vacío)                     | Carpeta de la versión web compilada; si se define, se sirve en `/` |
 
 Los endpoints se describen en [docs/api.md](../docs/api.md).

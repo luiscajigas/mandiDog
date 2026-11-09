@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -121,7 +121,7 @@ class ResultadoScreen extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: _Miniatura(ruta: resultado.imagenPath, tamano: 92),
+                  child: _Miniatura(bytes: resultado.imagen, tamano: 92),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -244,9 +244,9 @@ class _Dato extends StatelessWidget {
 }
 
 class _Miniatura extends StatelessWidget {
-  const _Miniatura({required this.ruta, required this.tamano});
+  const _Miniatura({required this.bytes, required this.tamano});
 
-  final String? ruta;
+  final Uint8List? bytes;
   final double tamano;
 
   @override
@@ -257,9 +257,9 @@ class _Miniatura extends StatelessWidget {
       color: ColoresMandiDog.petroleo.withValues(alpha: 0.12),
       child: const Icon(Icons.pets_rounded, color: ColoresMandiDog.petroleo),
     );
-    if (ruta == null) return respaldo;
-    return Image.file(
-      File(ruta!),
+    if (bytes == null) return respaldo;
+    return Image.memory(
+      bytes!,
       width: tamano,
       height: tamano,
       fit: BoxFit.cover,

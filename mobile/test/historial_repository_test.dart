@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mandidog/data/repositories/historial_repository_local.dart';
 import 'package:mandidog/domain/entities/nivel_riesgo.dart';
@@ -15,7 +17,12 @@ void main() {
 
   test('guarda un análisis y lo vuelve a leer con todos sus datos', () async {
     final repositorio = HistorialRepositoryLocal(prefs);
-    final original = resultadoDePrueba(id: 'a1', nivel: NivelRiesgo.rojo, probabilidad: 0.87, imagenPath: '/tmp/foto.jpg');
+    final original = resultadoDePrueba(
+      id: 'a1',
+      nivel: NivelRiesgo.rojo,
+      probabilidad: 0.87,
+      imagen: Uint8List.fromList([1, 2, 3, 4]),
+    );
 
     await repositorio.guardar(original);
     final leidos = await HistorialRepositoryLocal(prefs).obtenerTodos();
@@ -30,7 +37,7 @@ void main() {
     expect(leido.versionModelo, 'demo-sin-entrenar');
     expect(leido.modoDemo, isTrue);
     expect(leido.fecha, original.fecha);
-    expect(leido.imagenPath, '/tmp/foto.jpg');
+    expect(leido.imagen, [1, 2, 3, 4]);
   });
 
   test('devuelve los análisis del más reciente al más antiguo', () async {
@@ -44,28 +51,46 @@ void main() {
     expect(ids, ['nuevo', 'medio', 'viejo']);
   });
 
-  test('usa la ruta definitiva de la foto al guardar', () async {
+  test('guarda una miniatura en lugar de la foto original', () async {
     final repositorio = HistorialRepositoryLocal(
       prefs,
-      persistirImagen: (ruta, id) async => '/documentos/analisis/$id.jpg',
+      reducirImagen: (original) async => Uint8List.fromList([9, 9]),
     );
 
-    final guardado = await repositorio.guardar(resultadoDePrueba(id: 'x', imagenPath: '/cache/temporal.jpg'));
+    final guardado = await repositorio.guardar(resultadoDePrueba(id: 'x', imagen: Uint8List(5000)));
 
-    expect(guardado.imagenPath, '/documentos/analisis/x.jpg');
-    expect((await repositorio.obtenerTodos()).single.imagenPath, '/documentos/analisis/x.jpg');
+    expect(guardado.imagen, [9, 9]);
+    expect((await repositorio.obtenerTodos()).single.imagen, [9, 9]);
   });
 
-  test('borrar el historial elimina los registros y sus fotos', () async {
-    final borradas = <String>[];
-    final repositorio = HistorialRepositoryLocal(prefs, borrarImagenes: (rutas) async => borradas.addAll(rutas));
-    await repositorio.guardar(resultadoDePrueba(id: '1', imagenPath: '/a.jpg'));
-    await repositorio.guardar(resultadoDePrueba(id: '2', imagenPath: '/b.jpg'));
+  test('si la miniatura no se puede crear, guarda el análisis sin foto', () async {
+    final repositorio = HistorialRepositoryLocal(prefs, reducirImagen: (_) async => null);
+
+    final guardado = await repositorio.guardar(resultadoDePrueba(id: 'y', imagen: Uint8List(10)));
+
+    expect(guardado.imagen, isNull);
+    expect(await repositorio.obtenerTodos(), hasLength(1));
+  });
+
+  test('conserva como máximo el número de registros configurado', () async {
+    final repositorio = HistorialRepositoryLocal(prefs, maximoRegistros: 3);
+    for (var i = 1; i <= 5; i++) {
+      await repositorio.guardar(resultadoDePrueba(id: '$i', fecha: DateTime(2026, 1, i)));
+    }
+
+    final ids = (await repositorio.obtenerTodos()).map((r) => r.id).toList();
+
+    expect(ids, ['5', '4', '3']);
+  });
+
+  test('borrar el historial elimina todos los registros', () async {
+    final repositorio = HistorialRepositoryLocal(prefs);
+    await repositorio.guardar(resultadoDePrueba(id: '1'));
+    await repositorio.guardar(resultadoDePrueba(id: '2'));
 
     await repositorio.borrarTodo();
 
     expect(await repositorio.obtenerTodos(), isEmpty);
-    expect(borradas, unorderedEquals(['/a.jpg', '/b.jpg']));
   });
 
   test('un historial vacío o dañado no rompe la app', () async {
