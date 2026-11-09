@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     umbral_rojo: float = Field(default=0.60, ge=0.0, le=1.0, alias="UMBRAL_ROJO")
     max_tamano_mb: int = Field(default=10, gt=0, alias="MAX_TAMANO_MB")
     cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
+    web_dir: str = Field(default="", alias="WEB_DIR")
+    """Carpeta con la versión web compilada de la app. Si se define, la API también la sirve en "/"."""
 
     @model_validator(mode="after")
     def _validar_umbrales(self) -> "Settings":

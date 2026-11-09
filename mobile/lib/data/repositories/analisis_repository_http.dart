@@ -1,4 +1,5 @@
 import '../../domain/entities/estado_servidor.dart';
+import '../../domain/entities/imagen_capturada.dart';
 import '../../domain/entities/resultado_analisis.dart';
 import '../../domain/errores.dart';
 import '../../domain/repositories/analisis_repository.dart';
@@ -11,13 +12,13 @@ class AnalisisRepositoryHttp implements AnalisisRepository {
   final MandiDogApiClient _api;
 
   @override
-  Future<ResultadoAnalisis> analizar(String imagenPath) async {
-    final json = await _api.analizar(imagenPath);
+  Future<ResultadoAnalisis> analizar(ImagenCapturada imagen) async {
+    final json = await _api.analizar(imagen);
     try {
       return ResultadoAnalisis.fromJson(
         json,
         id: DateTime.now().microsecondsSinceEpoch.toString(),
-        imagenPath: imagenPath,
+        imagen: imagen.bytes,
       );
     } on Object {
       throw const ErrorServidorException('La respuesta del servidor no tiene el formato esperado.');

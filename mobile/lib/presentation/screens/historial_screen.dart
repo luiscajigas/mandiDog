@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -109,7 +107,7 @@ class _ElementoHistorial extends StatelessWidget {
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
     final fecha = DateFormat("d MMM y · h:mm a", 'es').format(resultado.fecha);
-    final ruta = resultado.imagenPath;
+    final imagen = resultado.imagen;
     final respaldo = Container(
       width: 64,
       height: 64,
@@ -124,10 +122,10 @@ class _ElementoHistorial extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: ruta == null
+            child: imagen == null
                 ? respaldo
-                : Image.file(
-                    File(ruta),
+                : Image.memory(
+                    imagen,
                     width: 64,
                     height: 64,
                     fit: BoxFit.cover,

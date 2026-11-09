@@ -1,56 +1,60 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../../domain/entities/imagen_capturada.dart';
 import '../../domain/errores.dart';
+
+/// Devuelve la URL base vigente (puede cambiar si el usuario configura otro servidor).
+typedef ProveedorUrl = String Function();
 
 /// Cliente de bajo nivel para la API de MandiDog IA. Solo lo usa la capa de datos.
 class MandiDogApiClient {
   MandiDogApiClient({
     required this._cliente,
-    required String urlBase,
+    required this._urlBase,
     this.tiempoAnalisis = const Duration(seconds: 45),
     this.tiempoEstado = const Duration(seconds: 6),
-  }) : _urlBase = Uri.parse(urlBase.endsWith('/') ? urlBase : '$urlBase/');
+  });
 
   final http.Client _cliente;
-  final Uri _urlBase;
+  final ProveedorUrl _urlBase;
   final Duration tiempoAnalisis;
   final Duration tiempoEstado;
 
-  Uri get urlBase => _urlBase;
+  Uri _resolver(String ruta) {
+    final base = _urlBase();
+    final uri = Uri.tryParse(base.endsWith('/') ? base : '$base/');
+    if (uri == null || uri.host.isEmpty || !uri.isScheme('http') && !uri.isScheme('https')) {
+      throw const SinConexionException();
+    }
+    return uri.resolve(ruta);
+  }
 
   Future<Map<String, dynamic>> health() async {
-    final respuesta = await _ejecutar(() => _cliente.get(_urlBase.resolve('health')), tiempoEstado);
+    final respuesta = await _ejecutar(() => _cliente.get(_resolver('health')), tiempoEstado);
     return _decodificar(respuesta);
   }
 
-  Future<Map<String, dynamic>> analizar(String imagenPath) async {
-    final archivo = File(imagenPath);
-    if (!await archivo.exists()) {
-      throw const ImagenRechazadaException('No encontramos la foto. Tómala o selecciónala de nuevo.');
+  Future<Map<String, dynamic>> analizar(ImagenCapturada imagen) async {
+    if (imagen.bytes.isEmpty) {
+      throw const ImagenRechazadaException('La foto está vacía. Tómala o selecciónala de nuevo.');
     }
 
-    final solicitud = http.MultipartRequest('POST', _urlBase.resolve('v1/analisis'))
-      ..files.add(await http.MultipartFile.fromPath(
-        'imagen',
-        imagenPath,
-        contentType: _tipoMime(imagenPath),
-      ));
-
     final respuesta = await _ejecutar(() async {
+      final solicitud = http.MultipartRequest('POST', _resolver('v1/analisis'))
+        ..files.add(http.MultipartFile.fromBytes(
+          'imagen',
+          imagen.bytes,
+          filename: imagen.nombreNormalizado,
+          contentType: MediaType.parse(imagen.tipoMime),
+        ));
       final enviada = await _cliente.send(solicitud);
       return http.Response.fromStream(enviada);
     }, tiempoAnalisis);
     return _decodificar(respuesta);
-  }
-
-  MediaType _tipoMime(String ruta) {
-    final extension = ruta.toLowerCase();
-    return extension.endsWith('.png') ? MediaType('image', 'png') : MediaType('image', 'jpeg');
   }
 
   Future<http.Response> _ejecutar(Future<http.Response> Function() accion, Duration limite) async {
@@ -58,11 +62,13 @@ class MandiDogApiClient {
       return await accion().timeout(limite);
     } on TimeoutException {
       throw const SinConexionException();
-    } on SocketException {
-      throw const SinConexionException();
     } on http.ClientException {
       throw const SinConexionException();
-    } on HandshakeException {
+    } on FormatException {
+      // URL del servidor mal escrita.
+      throw const SinConexionException();
+    } on Exception {
+      // Errores de red propios de cada plataforma (por ejemplo, SocketException en Android).
       throw const SinConexionException();
     }
   }

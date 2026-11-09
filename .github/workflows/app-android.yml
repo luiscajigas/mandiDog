@@ -1,0 +1,122 @@
+name: App Android (APK) y web
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/app-android.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Dirección predeterminada de la API dentro del APK (se puede cambiar desde la app)"
+        required: false
+        default: ""
+
+concurrency:
+  group: app-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Analizar, probar y compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Análisis estático
+        run: flutter analyze
+
+      - name: Pruebas
+        run: flutter test --reporter github
+
+      - name: Compilar APK
+        env:
+          API_URL: ${{ github.event.inputs.api_url }}
+        run: |
+          if [ -n "$API_URL" ]; then
+            flutter build apk --release --dart-define=API_URL="$API_URL"
+          else
+            flutter build apk --release
+          fi
+
+      - name: Publicar el APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandidog-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  web:
+    name: Pruebas en Chrome y compilación web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Pruebas en Chrome
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test --platform chrome --reporter expanded 2>&1 | tee salida-pruebas.txt
+
+      - name: Detallar pruebas fallidas
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          lineas = open("salida-pruebas.txt", encoding="utf-8", errors="replace").read().splitlines()
+          bloques = []
+          for i, linea in enumerate(lineas):
+              if "[E]" in linea:
+                  previas = [l.strip() for l in lineas[max(0, i - 40):i] if l.strip() and set(l.strip()) - set("═")]
+                  previas = [l for l in previas if not l[:5].replace(":", "").isdigit()]
+                  siguientes = [l.strip() for l in lineas[i + 1:i + 30] if l.strip() and set(l.strip()) - set("═")]
+                  bloques.append(" | ".join(previas[-10:] + [linea.strip()] + siguientes))
+          for bloque in bloques[:5] or ["Sin detalle en la salida"]:
+              print("::error::" + bloque[:1800].replace("%", "%25"))
+          PY
+
+      - name: Compilar versión web
+        run: flutter build web --release
+
+      - name: Publicar la versión web como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandidog-web
+          path: mobile/build/web
+          retention-days: 30
