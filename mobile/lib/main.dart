@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/config.dart';
-import 'data/datasources/almacen_imagenes.dart';
 import 'data/datasources/mandidog_api_client.dart';
+import 'data/datasources/miniaturas.dart';
 import 'data/repositories/analisis_repository_http.dart';
 import 'data/repositories/historial_repository_local.dart';
 import 'data/repositories/preferencias_repository_local.dart';
@@ -28,17 +28,16 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
 
   final prefs = await SharedPreferences.getInstance();
-  final clienteHttp = http.Client();
-  final api = MandiDogApiClient(cliente: clienteHttp, urlBase: ConfiguracionApp.apiUrl);
-  final almacen = AlmacenImagenes();
-
   final PreferenciasRepository preferencias = PreferenciasRepositoryLocal(prefs);
-  final AnalisisRepository analisis = AnalisisRepositoryHttp(api);
-  final HistorialRepository historial = HistorialRepositoryLocal(
-    prefs,
-    persistirImagen: almacen.persistir,
-    borrarImagenes: almacen.borrar,
+
+  // La URL se consulta en cada petición para respetar el servidor que elija el usuario.
+  final api = MandiDogApiClient(
+    cliente: http.Client(),
+    urlBase: () => preferencias.urlServidor ?? ConfiguracionApp.urlPorDefecto,
   );
+
+  final AnalisisRepository analisis = AnalisisRepositoryHttp(api);
+  final HistorialRepository historial = HistorialRepositoryLocal(prefs, reducirImagen: crearMiniatura);
 
   runApp(
     MultiProvider(

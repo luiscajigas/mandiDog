@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'nivel_riesgo.dart';
 
 /// Resultado de un análisis, tal como lo usa la app (y como se guarda en el historial).
@@ -11,7 +14,7 @@ class ResultadoAnalisis {
     required this.versionModelo,
     required this.modoDemo,
     required this.fecha,
-    this.imagenPath,
+    this.imagen,
   });
 
   final String id;
@@ -25,13 +28,13 @@ class ResultadoAnalisis {
   final bool modoDemo;
   final DateTime fecha;
 
-  /// Ruta local de la foto analizada.
-  final String? imagenPath;
+  /// Foto analizada (en el historial se guarda una miniatura).
+  final Uint8List? imagen;
 
   /// Confianza del modelo en la clase que predijo (con o sin signos), entre 0 y 1.
   double get confianza => probabilidad >= 0.5 ? probabilidad : 1 - probabilidad;
 
-  ResultadoAnalisis copyWith({String? imagenPath}) {
+  ResultadoAnalisis copyWith({Uint8List? imagen, bool quitarImagen = false}) {
     return ResultadoAnalisis(
       id: id,
       probabilidad: probabilidad,
@@ -41,7 +44,7 @@ class ResultadoAnalisis {
       versionModelo: versionModelo,
       modoDemo: modoDemo,
       fecha: fecha,
-      imagenPath: imagenPath ?? this.imagenPath,
+      imagen: quitarImagen ? null : (imagen ?? this.imagen),
     );
   }
 
@@ -54,11 +57,12 @@ class ResultadoAnalisis {
         'version_modelo': versionModelo,
         'modo_demo': modoDemo,
         'fecha': fecha.toIso8601String(),
-        'imagen_path': imagenPath,
+        if (imagen != null) 'imagen': base64Encode(imagen!),
       };
 
-  factory ResultadoAnalisis.fromJson(Map<String, dynamic> json, {String? id, String? imagenPath}) {
+  factory ResultadoAnalisis.fromJson(Map<String, dynamic> json, {String? id, Uint8List? imagen}) {
     final fecha = DateTime.tryParse(json['fecha'] as String? ?? '')?.toLocal() ?? DateTime.now();
+    final imagenGuardada = json['imagen'];
     return ResultadoAnalisis(
       id: id ?? json['id'] as String? ?? fecha.microsecondsSinceEpoch.toString(),
       probabilidad: (json['probabilidad'] as num).toDouble().clamp(0.0, 1.0),
@@ -68,7 +72,7 @@ class ResultadoAnalisis {
       versionModelo: json['version_modelo'] as String? ?? 'desconocida',
       modoDemo: json['modo_demo'] as bool? ?? false,
       fecha: fecha,
-      imagenPath: imagenPath ?? json['imagen_path'] as String?,
+      imagen: imagen ?? (imagenGuardada is String ? base64Decode(imagenGuardada) : null),
     );
   }
 }

@@ -1,28 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mandidog/data/datasources/mandidog_api_client.dart';
 import 'package:mandidog/data/repositories/analisis_repository_http.dart';
+import 'package:mandidog/domain/entities/imagen_capturada.dart';
 import 'package:mandidog/domain/entities/nivel_riesgo.dart';
 import 'package:mandidog/domain/errores.dart';
 
 void main() {
-  late Directory temporal;
-  late String foto;
+  final foto = ImagenCapturada(bytes: Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3]), nombre: 'boca.jpg');
 
-  setUp(() async {
-    temporal = await Directory.systemTemp.createTemp('mandidog_test');
-    foto = '${temporal.path}${Platform.pathSeparator}boca.jpg';
-    await File(foto).writeAsBytes([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3]);
-  });
-
-  tearDown(() => temporal.delete(recursive: true));
-
-  AnalisisRepositoryHttp repositorioCon(MockClientHandler manejador) {
-    final api = MandiDogApiClient(cliente: MockClient(manejador), urlBase: 'http://servidor:8000');
+  AnalisisRepositoryHttp repositorioCon(MockClientHandler manejador, {String url = 'http://servidor:8000'}) {
+    final api = MandiDogApiClient(cliente: MockClient(manejador), urlBase: () => url);
     return AnalisisRepositoryHttp(api);
   }
 
@@ -54,7 +47,7 @@ void main() {
     expect(resultado.nivel, NivelRiesgo.rojo);
     expect(resultado.probabilidad, 0.73);
     expect(resultado.modoDemo, isFalse);
-    expect(resultado.imagenPath, foto);
+    expect(resultado.imagen, foto.bytes);
   });
 
   test('un 422 se traduce en ImagenRechazadaException con el mensaje del servidor', () async {
@@ -77,6 +70,31 @@ void main() {
         'No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo',
       )),
     );
+  });
+
+  test('usa la dirección de servidor vigente en cada petición', () async {
+    final urls = <String>[];
+    var actual = 'http://10.0.2.2:8000';
+    final api = MandiDogApiClient(
+      cliente: MockClient((solicitud) async {
+        urls.add(solicitud.url.toString());
+        return json({'estado': 'ok', 'version_modelo': 'v', 'modo_demo': false}, 200);
+      }),
+      urlBase: () => actual,
+    );
+    final repositorio = AnalisisRepositoryHttp(api);
+
+    await repositorio.consultarEstado();
+    actual = 'http://192.168.1.7:8000/';
+    await repositorio.consultarEstado();
+
+    expect(urls, ['http://10.0.2.2:8000/health', 'http://192.168.1.7:8000/health']);
+  });
+
+  test('una dirección de servidor mal escrita se informa como falta de conexión', () async {
+    final repositorio = repositorioCon((_) async => json({}, 200), url: 'http://');
+
+    expect(() => repositorio.analizar(foto), throwsA(isA<SinConexionException>()));
   });
 
   test('consultarEstado informa el modo demostración', () async {

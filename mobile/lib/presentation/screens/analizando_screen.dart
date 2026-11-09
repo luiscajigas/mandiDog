@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/navegacion/rutas.dart';
 import '../../core/theme/colores.dart';
+import '../../domain/entities/imagen_capturada.dart';
 import '../../domain/errores.dart';
 import '../../domain/repositories/analisis_repository.dart';
 import '../../domain/repositories/historial_repository.dart';
@@ -14,9 +14,9 @@ import 'resultado_screen.dart';
 
 /// Envía la foto al repositorio mientras muestra una animación con mensajes.
 class AnalizandoScreen extends StatefulWidget {
-  const AnalizandoScreen({super.key, required this.imagenPath});
+  const AnalizandoScreen({super.key, required this.imagen});
 
-  final String imagenPath;
+  final ImagenCapturada imagen;
 
   @override
   State<AnalizandoScreen> createState() => _AnalizandoScreenState();
@@ -76,7 +76,7 @@ class _AnalizandoScreenState extends State<AnalizandoScreen> with SingleTickerPr
     final inicio = DateTime.now();
 
     try {
-      final resultado = await analisis.analizar(widget.imagenPath);
+      final resultado = await analisis.analizar(widget.imagen);
       final guardado = await historial.guardar(resultado).catchError((_) => resultado);
 
       // Mantiene la animación un momento para que la transición no sea brusca.
@@ -162,8 +162,8 @@ class _AnalizandoScreenState extends State<AnalizandoScreen> with SingleTickerPr
                     child: CircularProgressIndicator(strokeWidth: 5, color: ColoresMandiDog.coral),
                   ),
                   ClipOval(
-                    child: Image.file(
-                      File(widget.imagenPath),
+                    child: Image.memory(
+                      widget.imagen.bytes,
                       width: 150,
                       height: 150,
                       fit: BoxFit.cover,
