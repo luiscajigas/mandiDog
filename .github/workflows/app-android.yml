@@ -105,7 +105,8 @@ jobs:
               if "[E]" in linea:
                   previas = [l.strip() for l in lineas[max(0, i - 40):i] if l.strip() and set(l.strip()) - set("═")]
                   previas = [l for l in previas if not l[:5].replace(":", "").isdigit()]
-                  bloques.append(" | ".join(previas[-25:] + [linea.strip()]))
+                  siguientes = [l.strip() for l in lineas[i + 1:i + 30] if l.strip() and set(l.strip()) - set("═")]
+                  bloques.append(" | ".join(previas[-10:] + [linea.strip()] + siguientes))
           for bloque in bloques[:5] or ["Sin detalle en la salida"]:
               print("::error::" + bloque[:1800].replace("%", "%25"))
           PY

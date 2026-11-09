@@ -13,6 +13,8 @@ void main() {
     final resultado = resultadoDePrueba(nivel: NivelRiesgo.amarillo, modoDemo: true);
     await tester.pumpWidget(envolver(ResultadoScreen(resultado: resultado)));
     await tester.pumpAndSettle();
+    final excepcion = tester.takeException();
+    expect(excepcion, isNull, reason: 'Excepción al construir: $excepcion');
 
     expect(find.byType(Semaforo), findsOneWidget);
     expect(find.text('NIVEL AMARILLO'), findsOneWidget);
