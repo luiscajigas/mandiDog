@@ -50,7 +50,7 @@ jobs:
         run: flutter analyze
 
       - name: Pruebas
-        run: flutter test
+        run: flutter test --reporter github
 
       - name: Compilar APK
         env:
@@ -90,7 +90,7 @@ jobs:
         run: flutter pub get
 
       - name: Pruebas en Chrome
-        run: flutter test --platform chrome
+        run: flutter test --platform chrome --reporter github
 
       - name: Compilar versión web
         run: flutter build web --release
