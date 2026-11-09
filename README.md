@@ -99,6 +99,19 @@ Cada vez que se suben cambios a `main` o `develop`, GitHub Actions ejecuta las p
 3. Copie el APK al teléfono Android, ábralo y permita instalar apps de origen desconocido.
 4. En la app, toque el ícono de servidor y escriba la dirección de la API (por ejemplo `http://192.168.1.7:8000`).
 
+#### Versiones publicadas (Releases)
+
+Para un enlace de descarga directo, sin cuenta de GitHub, se publica una versión con una etiqueta:
+
+```bash
+git tag -a v1.1.0 -m "MandiDog IA 1.1.0"
+git push origin v1.1.0
+```
+
+GitHub Actions prueba y compila el APK y lo adjunta a una Release en la pestaña **Releases** del repositorio
+(archivo `MandiDog-IA-v1.1.0.apk`). La última versión siempre queda en
+`https://github.com/luiscajigas/mandiDog/releases/latest`.
+
 ### Versión web (iPhone o cualquier navegador)
 
 La misma app se compila para web y la API puede servirla. Así se puede usar desde un iPhone sin instalar nada:
