@@ -34,14 +34,15 @@ Este documento describe la arquitectura del prototipo con el modelo C4 (Contexto
 
 | Contenedor | Tecnología | Responsabilidad |
 |------------|------------|-----------------|
-| **App móvil** | Flutter (Dart), Android | Captura con marco de encuadre, envío de la foto, presentación del semáforo, historial local |
-| **Almacenamiento local** | SharedPreferences (JSON) + carpeta privada de la app | Historial de análisis y fotos analizadas, solo en el dispositivo |
+| **App móvil** | Flutter (Dart), Android y web | Captura con marco de encuadre, envío de la foto, presentación del semáforo, historial local. El mismo código se compila como APK y como aplicación web para iPhone |
+| **Almacenamiento local** | SharedPreferences (JSON; en web, almacenamiento local del navegador) | Historial de análisis con una miniatura de cada foto, solo en el dispositivo |
 | **API de análisis** | Python 3.11, FastAPI, Uvicorn, Docker | Validar la imagen, ejecutar la inferencia, traducir la probabilidad a nivel de riesgo |
 | **Modelo** | Archivo Keras (`mandidog_v1.keras`) | Red convolucional MobileNetV2 con clasificador binario |
 | **Pipeline de entrenamiento** | TensorFlow/Keras (`ml/train.py`, Colab) | Producir el modelo y sus métricas a partir de las carpetas de datos |
 
 **Comunicación**
 
+- La API puede servir también la versión web compilada (`WEB_DIR`), de modo que el navegador carga la app y llama a la API desde el mismo origen.
 - App → API: HTTP/JSON. `GET /health` para el indicador de estado y `POST /v1/analisis` (multipart) para analizar.
 - API → Modelo: carga del archivo en memoria al iniciar.
 - Entrenamiento → Modelo: genera el archivo que luego se copia en `api/models/` (o se monta como volumen en Docker).
@@ -114,7 +115,8 @@ Los detalles de clases y funciones están en el código fuente y sus pruebas:
 | Facilidad de prueba | Inyección de dependencias en ambos lados; pruebas automáticas con adaptadores y repositorios falsos |
 | Privacidad | Las fotos no se guardan en el servidor; el historial solo existe en el teléfono |
 | Robustez | Validación de imágenes, mensajes de error en español, la app nunca se cierra ante errores de red |
-| Portabilidad | API en contenedor Docker; URL de la API configurable con `--dart-define` |
+| Portabilidad | API en contenedor Docker; app para Android y web; URL de la API configurable con `--dart-define` o desde la app |
+| Integración continua | GitHub Actions ejecuta pytest, flutter analyze y flutter test, y compila el APK |
 
 ## Fuera del alcance del prototipo (queda como diseño)
 

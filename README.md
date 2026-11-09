@@ -88,6 +88,34 @@ flutter run --dart-define=API_URL=http://192.168.1.50:8000     # teléfono en la
 - Análisis estático: `flutter analyze`
 - Pruebas: `flutter test`
 
+La dirección del servidor también se puede cambiar desde la app: **Inicio → ícono de servidor**.
+
+### Instalar el APK sin Android Studio
+
+Cada vez que se suben cambios a `main` o `develop`, GitHub Actions ejecuta las pruebas y compila el APK. Para descargarlo:
+
+1. En GitHub, abra la pestaña **Actions** → flujo **App Android (APK)** → la ejecución más reciente.
+2. Descargue el artefacto **mandidog-apk** (un .zip con `app-release.apk`).
+3. Copie el APK al teléfono Android, ábralo y permita instalar apps de origen desconocido.
+4. En la app, toque el ícono de servidor y escriba la dirección de la API (por ejemplo `http://192.168.1.7:8000`).
+
+### Versión web (iPhone o cualquier navegador)
+
+La misma app se compila para web y la API puede servirla. Así se puede usar desde un iPhone sin instalar nada:
+
+```bash
+cd mobile
+flutter build web --release
+
+cd ../api
+set WEB_DIR=../mobile/build/web                 # Linux/macOS: export WEB_DIR=../mobile/build/web
+uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+En el iPhone, conectado a la **misma red Wi-Fi**, abra Safari en `http://IP-DEL-COMPUTADOR:8080` y, si quiere, use **Compartir → Agregar a pantalla de inicio**. En la versión web, el botón de la cámara abre la cámara del teléfono y el marco de encuadre se muestra como guía.
+
+Si el teléfono no carga la página, permita en el firewall de Windows las conexiones entrantes al puerto 8080 en redes privadas.
+
 ## Entrenar el modelo
 
 Los datos **no** se versionan. Prepare `ml/data/con_signos/` y `ml/data/sin_signos/` siguiendo [ml/README.md](ml/README.md) (dataset público *dog dental* de Roboflow Universe, CC BY 4.0, y fotos locales con consentimiento).
@@ -106,6 +134,8 @@ El script produce `metrics.json` con exactitud, precisión, sensibilidad, especi
 
 **Incluye**
 
+- Versión web de la misma app, usable desde el navegador de un iPhone.
+- Compilación automática del APK y pruebas en GitHub Actions.
 - App Android con bienvenida, inicio, captura con marco de encuadre, análisis, resultado con semáforo, historial local, acerca de y tema oscuro.
 - API con validación de imágenes, inferencia con TensorFlow, modo demostración, Docker y pruebas automáticas.
 - Pipeline de entrenamiento reproducible (script y notebook) con métricas de evaluación.
