@@ -29,6 +29,14 @@ android {
         versionName = flutter.versionName
     }
 
+    // La app usa el intérprete clásico de TensorFlow Lite (libtensorflowlite_jni.so) en la CPU.
+    // Se excluyen las librerías de GPU y del motor LiteRT Next, que nunca se cargan.
+    packaging {
+        jniLibs {
+            excludes += setOf("**/libLiteRt.so", "**/libLiteRtClGlAccelerator.so", "**/libtensorflowlite_gpu_jni.so")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
