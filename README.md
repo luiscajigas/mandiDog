@@ -106,7 +106,7 @@ Cuando la app usa la API (versión web o `ANALISIS_EN_SERVIDOR=true`), la direcc
 Cada vez que se suben cambios a `main` o `develop`, GitHub Actions ejecuta las pruebas y compila el APK. Para descargarlo:
 
 1. En GitHub, abra la pestaña **Actions** → flujo **App Android (APK) y web** → la ejecución más reciente.
-2. Descargue el artefacto **mandidog-apk** (un .zip con `app-release.apk`).
+2. Descargue el artefacto **mandidog-apk**: un .zip con `app-arm64-v8a-release.apk` (celulares actuales, de 64 bits) y `app-armeabi-v7a-release.apk` (celulares antiguos, de 32 bits).
 3. Copie el APK al teléfono Android, ábralo y permita instalar apps de origen desconocido.
 4. Abra MandiDog IA y analice una foto. No necesita internet ni un computador encendido.
 
@@ -120,7 +120,7 @@ git push origin v1.1.0
 ```
 
 GitHub Actions prueba y compila el APK y lo adjunta a una Release en la pestaña **Releases** del repositorio
-(archivo `MandiDog-IA-v1.1.0.apk`). La última versión siempre queda en
+(archivos `MandiDog-IA-v1.1.0.apk` para celulares de 64 bits y `MandiDog-IA-v1.1.0-32bits.apk` para celulares antiguos). Para que pese menos, se compila un APK por tipo de procesador, sin la versión para emuladores (x86_64) ni las librerías de GPU, que la app no usa. La última versión siempre queda en
 `https://github.com/luiscajigas/mandiDog/releases/latest`.
 
 ### Versión web (iPhone o cualquier navegador)

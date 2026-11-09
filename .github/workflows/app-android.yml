@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: "Dirección predeterminada de la API dentro del APK (se puede cambiar desde la app)"
+        description: "Opcional: usar la API en lugar del análisis en el teléfono (dirección de la API)"
         required: false
         default: ""
 
@@ -59,11 +59,14 @@ jobs:
           API_URL: ${{ github.event.inputs.api_url }}
         run: |
           set -o pipefail
+          # Un APK por tipo de procesador (64 y 32 bits) para que pese menos; x86_64 solo se usa en emuladores.
+          OPCIONES="--release --split-per-abi --target-platform android-arm,android-arm64"
           if [ -n "$API_URL" ]; then
-            flutter build apk --release --dart-define=API_URL="$API_URL" 2>&1 | tee salida-apk.txt
+            flutter build apk $OPCIONES --dart-define=ANALISIS_EN_SERVIDOR=true --dart-define=API_URL="$API_URL" 2>&1 | tee salida-apk.txt
           else
-            flutter build apk --release 2>&1 | tee salida-apk.txt
+            flutter build apk $OPCIONES 2>&1 | tee salida-apk.txt
           fi
+          ls -lh build/app/outputs/flutter-apk/*.apk
 
       - name: Detallar el error de compilación
         if: failure()
@@ -82,7 +85,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mandidog-apk
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            mobile/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           retention-days: 30
 
   release:
@@ -104,17 +109,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ETIQUETA: ${{ github.ref_name }}
         run: |
-          mv app-release.apk "MandiDog-IA-${ETIQUETA}.apk"
+          mv app-arm64-v8a-release.apk "MandiDog-IA-${ETIQUETA}.apk"
+          mv app-armeabi-v7a-release.apk "MandiDog-IA-${ETIQUETA}-32bits.apk"
           cat > notas.md <<'NOTAS'
           ## Cómo instalar en Android
 
-          1. Descarga el archivo `.apk` de esta página desde el celular.
+          1. Descarga desde el celular el archivo `MandiDog-IA-vX.Y.Z.apk` (sirve para casi todos los Android actuales). Solo si tu celular es muy antiguo y ese no se instala, usa el que termina en `-32bits.apk`.
           2. Ábrelo y, si Android lo pide, permite instalar apps de origen desconocido.
           3. Abre MandiDog IA y toma o elige una foto. El análisis se hace dentro del teléfono: no necesita internet ni un computador encendido.
 
           > Herramienta de apoyo. No reemplaza el diagnóstico de un médico veterinario.
           NOTAS
-          gh release create "$ETIQUETA" "MandiDog-IA-${ETIQUETA}.apk" --repo "$GITHUB_REPOSITORY" --title "MandiDog IA ${ETIQUETA}" --notes-file notas.md
+          gh release create "$ETIQUETA" "MandiDog-IA-${ETIQUETA}.apk" "MandiDog-IA-${ETIQUETA}-32bits.apk" --repo "$GITHUB_REPOSITORY" --title "MandiDog IA ${ETIQUETA}" --notes-file notas.md
 
   web:
     name: Pruebas en Chrome y compilación web
