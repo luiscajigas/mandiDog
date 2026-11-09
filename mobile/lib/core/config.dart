@@ -7,8 +7,14 @@ import 'package:flutter/foundation.dart';
 ///  * en Android se usa http://10.0.2.2:8000 (el equipo anfitrión visto desde el emulador);
 ///  * en la versión web se usa el mismo servidor desde el que se abrió la página.
 /// El usuario puede cambiarla desde la app (Inicio → Servidor).
+///
+/// En Android las fotos se analizan dentro del teléfono (TensorFlow Lite), sin servidor.
+/// Para usar la API también en Android: --dart-define=ANALISIS_EN_SERVIDOR=true
 abstract final class ConfiguracionApp {
   static const _apiUrlCompilada = String.fromEnvironment('API_URL');
+
+  /// true si las fotos se envían a la API; la versión web siempre usa la API.
+  static bool get analisisEnServidor => kIsWeb || const bool.fromEnvironment('ANALISIS_EN_SERVIDOR');
 
   static String get urlPorDefecto {
     if (_apiUrlCompilada.isNotEmpty) return _apiUrlCompilada;
@@ -35,5 +41,5 @@ abstract final class ConfiguracionApp {
   static const programa = 'Ingeniería de Software';
   static const ciudad = 'San Juan de Pasto';
   static const anio = '2026';
-  static const version = '1.1.0';
+  static const version = '1.2.0';
 }

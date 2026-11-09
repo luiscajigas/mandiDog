@@ -70,11 +70,12 @@ class _InicioScreenState extends State<InicioScreen> {
             icon: Icon(tema.oscuro ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
             onPressed: tema.alternar,
           ),
-          IconButton(
-            tooltip: 'Servidor',
-            icon: const Icon(Icons.dns_rounded),
-            onPressed: _configurarServidor,
-          ),
+          if (context.read<AnalisisRepository>().usaServidor)
+            IconButton(
+              tooltip: 'Servidor',
+              icon: const Icon(Icons.dns_rounded),
+              onPressed: _configurarServidor,
+            ),
           IconButton(
             tooltip: 'Acerca de',
             icon: const Icon(Icons.info_outline_rounded),
@@ -91,7 +92,12 @@ class _InicioScreenState extends State<InicioScreen> {
             const SizedBox(height: 4),
             Text('¿Cómo está la boca de tu perro hoy?', style: textos.bodyLarge),
             const SizedBox(height: 14),
-            _IndicadorServidor(estado: _estado, onReintentar: _actualizarEstado, onConfigurar: _configurarServidor),
+            _IndicadorServidor(
+              estado: _estado,
+              enTelefono: !context.read<AnalisisRepository>().usaServidor,
+              onReintentar: _actualizarEstado,
+              onConfigurar: _configurarServidor,
+            ),
             const SizedBox(height: 20),
             const _TarjetaAnalizar(),
             const SizedBox(height: 16),
@@ -188,9 +194,17 @@ class _TarjetaAnalizar extends StatelessWidget {
 }
 
 class _IndicadorServidor extends StatelessWidget {
-  const _IndicadorServidor({required this.estado, required this.onReintentar, required this.onConfigurar});
+  const _IndicadorServidor({
+    required this.estado,
+    required this.enTelefono,
+    required this.onReintentar,
+    required this.onConfigurar,
+  });
 
   final Future<EstadoServidor> estado;
+
+  /// true si las fotos se analizan dentro del teléfono (sin servidor).
+  final bool enTelefono;
   final Future<void> Function() onReintentar;
   final VoidCallback onConfigurar;
 
@@ -200,8 +214,12 @@ class _IndicadorServidor extends StatelessWidget {
       future: estado,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Wrap(children: [
-            _Etiqueta(icono: Icons.sync_rounded, texto: 'Conectando con el servidor…', color: Colors.blueGrey),
+          return Wrap(children: [
+            _Etiqueta(
+              icono: Icons.sync_rounded,
+              texto: enTelefono ? 'Preparando el análisis…' : 'Conectando con el servidor…',
+              color: Colors.blueGrey,
+            ),
           ]);
         }
         final datos = snapshot.data ?? const EstadoServidor.noDisponible();
@@ -228,7 +246,13 @@ class _IndicadorServidor extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            const _Etiqueta(icono: Icons.cloud_done_rounded, texto: 'Servidor conectado', color: ColoresMandiDog.verde),
+            enTelefono
+                ? const _Etiqueta(
+                    icono: Icons.phone_android_rounded,
+                    texto: 'Análisis en el teléfono',
+                    color: ColoresMandiDog.verde,
+                  )
+                : const _Etiqueta(icono: Icons.cloud_done_rounded, texto: 'Servidor conectado', color: ColoresMandiDog.verde),
             if (datos.modoDemo)
               const _Etiqueta(icono: Icons.science_rounded, texto: 'Modo demostración', color: ColoresMandiDog.coral),
           ],
