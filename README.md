@@ -94,7 +94,7 @@ La dirección del servidor también se puede cambiar desde la app: **Inicio → 
 
 Cada vez que se suben cambios a `main` o `develop`, GitHub Actions ejecuta las pruebas y compila el APK. Para descargarlo:
 
-1. En GitHub, abra la pestaña **Actions** → flujo **App Android (APK)** → la ejecución más reciente.
+1. En GitHub, abra la pestaña **Actions** → flujo **App Android (APK) y web** → la ejecución más reciente.
 2. Descargue el artefacto **mandidog-apk** (un .zip con `app-release.apk`).
 3. Copie el APK al teléfono Android, ábralo y permita instalar apps de origen desconocido.
 4. En la app, toque el ícono de servidor y escriba la dirección de la API (por ejemplo `http://192.168.1.7:8000`).
