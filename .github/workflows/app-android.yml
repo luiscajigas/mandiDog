@@ -90,7 +90,28 @@ jobs:
         run: flutter pub get
 
       - name: Pruebas en Chrome
-        run: flutter test --platform chrome --reporter github
+        run: flutter test --platform chrome --reporter github --file-reporter json:resultado-pruebas.json
+
+      - name: Detallar pruebas fallidas
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import json
+          pruebas, errores = {}, {}
+          with open("resultado-pruebas.json", encoding="utf-8") as f:
+              for linea in f:
+                  try:
+                      e = json.loads(linea)
+                  except ValueError:
+                      continue
+                  if e.get("type") == "testStart":
+                      pruebas[e["test"]["id"]] = e["test"]["name"]
+                  elif e.get("type") == "error":
+                      errores.setdefault(e["testID"], e["error"])
+          for id_, error in errores.items():
+              mensaje = " | ".join(error.strip().splitlines()[:6]).replace("%", "%25")
+              print(f"::error title=Prueba fallida: {pruebas.get(id_, id_)}::{mensaje}")
+          PY
 
       - name: Compilar versión web
         run: flutter build web --release
