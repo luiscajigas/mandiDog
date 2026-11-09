@@ -19,6 +19,13 @@ class ImagenRechazadaException extends AnalisisException {
   const ImagenRechazadaException(super.mensaje);
 }
 
+/// El análisis dentro del teléfono falló de forma inesperada.
+class ErrorAnalisisLocalException extends AnalisisException {
+  const ErrorAnalisisLocalException([
+    super.mensaje = 'No pudimos analizar la foto en el teléfono. Inténtalo de nuevo o prueba con otra foto.',
+  ]);
+}
+
 /// El servidor respondió con un error inesperado.
 class ErrorServidorException extends AnalisisException {
   const ErrorServidorException([

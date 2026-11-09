@@ -12,6 +12,9 @@ class AnalisisRepositoryHttp implements AnalisisRepository {
   final MandiDogApiClient _api;
 
   @override
+  bool get usaServidor => true;
+
+  @override
   Future<ResultadoAnalisis> analizar(ImagenCapturada imagen) async {
     final json = await _api.analizar(imagen);
     try {

@@ -6,6 +6,7 @@ Transfer learning con MobileNetV2 preentrenada en ImageNet, en dos fases:
 
 Entrada:  data/con_signos/  y  data/sin_signos/  (solo imágenes de perros)
 Salida:   models/mandidog_v1.keras  y  metrics.json
+          ../mobile/assets/modelo/mandidog.tflite  y  modelo.json  (para que la app analice sin servidor)
 
 Uso:
     python train.py --data data --salida models/mandidog_v1.keras
@@ -39,6 +40,7 @@ def argumentos() -> argparse.Namespace:
     parser.add_argument("--prueba", type=float, default=0.15, help="Proporción del conjunto de prueba")
     parser.add_argument("--validacion", type=float, default=0.15, help="Proporción del conjunto de validación")
     parser.add_argument("--semilla", type=int, default=42)
+    parser.add_argument("--sin-app", action="store_true", help="No exportar el modelo TensorFlow Lite para la app")
     return parser.parse_args()
 
 
@@ -225,6 +227,12 @@ def entrenar(args: argparse.Namespace) -> dict:
     print(json.dumps(metricas, indent=2, ensure_ascii=False))
     print(f"\nModelo guardado en {args.salida}")
     print(f"Métricas guardadas en {args.metricas}")
+
+    if not getattr(args, "sin_app", False):
+        from exportar_tflite import DESTINO_APP, exportar
+
+        print("\nExportando el modelo para la app (TensorFlow Lite)...")
+        exportar(args.salida, DESTINO_APP, umbral_amarillo=0.30, umbral_rojo=0.60)
     return metricas
 
 

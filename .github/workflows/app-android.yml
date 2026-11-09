@@ -95,7 +95,7 @@ jobs:
 
           1. Descarga el archivo `.apk` de esta página desde el celular.
           2. Ábrelo y, si Android lo pide, permite instalar apps de origen desconocido.
-          3. Abre MandiDog IA y, en el botón **Servidor** de la pantalla de inicio, escribe la dirección de la API (por ejemplo `http://192.168.1.7:8080`).
+          3. Abre MandiDog IA y toma o elige una foto. El análisis se hace dentro del teléfono: no necesita internet ni un computador encendido.
 
           > Herramienta de apoyo. No reemplaza el diagnóstico de un médico veterinario.
           NOTAS
