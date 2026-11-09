@@ -113,7 +113,8 @@ jobs:
           for id_, error in errores.items():
               lineas = [l.strip() for l in "\n".join(salidas.get(id_, [])).splitlines() if l.strip() and "═" not in l]
               detalle = " | ".join(lineas[:14]) or error.strip().splitlines()[0]
-              print(f"::error title=Prueba fallida: {pruebas.get(id_, id_)}::{detalle.replace('%', '%25')}")
+              texto = f"Prueba fallida [{pruebas.get(id_, id_)}] {detalle}"[:1500]
+              print("::error::" + texto.replace("%", "%25").replace("\r", "").replace("\n", " "))
           PY
 
       - name: Compilar versión web
