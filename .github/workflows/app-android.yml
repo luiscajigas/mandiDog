@@ -71,7 +71,7 @@ jobs:
           python3 - <<'PY'
           import re
           lineas = open("salida-apk.txt", encoding="utf-8", errors="replace").read().splitlines()
-          claves = re.compile(r"error|wrong|failed|exception|missing|cannot|requires|incompatible|minSdk", re.I)
+          claves = re.compile(r"^e: |error|wrong|failed|exception|missing|cannot|requires|incompatible|minSdk", re.I)
           utiles = [l.strip() for l in lineas if l.strip() and claves.search(l)]
           texto = " | ".join(dict.fromkeys(utiles))[:3800] or "Sin detalle en la salida"
           for i in range(0, len(texto), 1900):
