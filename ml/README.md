@@ -91,18 +91,38 @@ python train.py --data data --salida models/mandidog_v1.keras --metricas metrics
 ```
 
 Parámetros útiles: `--epocas-base 15`, `--epocas-ajuste 15`, `--lote 16`, `--capas-ajuste 30`, `--prueba 0.15`, `--validacion 0.15`, `--semilla 42`.
+Al terminar, el script también exporta el modelo para la app (ver más abajo); `--sin-app` lo omite.
 
 ## Entrenamiento en Google Colab
 
 1. Abra `train_colab.ipynb` en <https://colab.research.google.com> (Archivo → Subir cuaderno).
 2. Active la GPU: Entorno de ejecución → Cambiar tipo de entorno → GPU.
 3. Suba a Google Drive una carpeta `mandidog/data` con `con_signos/` y `sin_signos/`.
-4. Ejecute todas las celdas. Al final se descargan `mandidog_v1.keras` y `metrics.json`.
+4. Ejecute todas las celdas. Al final se descargan `mandidog_v1.keras`, `metrics.json`, `mandidog.tflite` y `modelo.json`.
 
 ## Salidas
 
 - `models/mandidog_v1.keras`: modelo listo para la API.
+- `../mobile/assets/modelo/mandidog.tflite` y `modelo.json`: el mismo modelo en TensorFlow Lite, para que la app analice las fotos dentro del teléfono.
 - `metrics.json`: métricas sobre el conjunto de prueba: exactitud, precisión, sensibilidad, especificidad, F1 y matriz de confusión.
+
+## Usar el modelo en la app (sin servidor)
+
+La app de Android ejecuta el modelo en el propio teléfono, sin internet ni computador encendido.
+`train.py` deja los archivos en `mobile/assets/modelo/` automáticamente. Para exportar un modelo ya entrenado:
+
+```bash
+python exportar_tflite.py --modelo models/mandidog_v1.keras
+python exportar_tflite.py --modelo models/mandidog_v1.keras --umbral-amarillo 0.25 --umbral-rojo 0.55
+```
+
+- `mandidog.tflite`: entrada (1, 224, 224, 3) en RGB normalizado entre 0 y 1, igual que en la API; salida: probabilidad de "con signos".
+- `modelo.json`: versión del modelo y umbrales del semáforo. Se pueden ajustar sin volver a entrenar.
+- `--cuantizar` reduce el archivo a la cuarta parte (unos 2,5 MB) a cambio de una pequeña variación en la probabilidad.
+
+El script compara el modelo convertido con el original y muestra la diferencia máxima.
+Después se suben los dos archivos al repositorio: GitHub Actions compila el APK con el modelo incluido.
+Mientras la carpeta no tenga un modelo, la app funciona en modo demostración.
 
 ## Usar el modelo en la API
 
