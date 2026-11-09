@@ -1,4 +1,4 @@
-name: App Android (APK)
+name: App Android (APK) y web
 
 on:
   push:
@@ -67,4 +67,37 @@ jobs:
         with:
           name: mandidog-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  web:
+    name: Pruebas en Chrome y compilación web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Pruebas en Chrome
+        run: flutter test --platform chrome
+
+      - name: Compilar versión web
+        run: flutter build web --release
+
+      - name: Publicar la versión web como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandidog-web
+          path: mobile/build/web
           retention-days: 30

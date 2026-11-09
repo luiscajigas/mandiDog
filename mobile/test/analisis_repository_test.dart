@@ -1,3 +1,7 @@
+// Usa SocketException de dart:io para simular la caída de la red; solo corre en la VM.
+@TestOn('vm')
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
