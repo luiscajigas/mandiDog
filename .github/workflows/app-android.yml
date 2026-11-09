@@ -97,7 +97,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json
-          pruebas, errores = {}, {}
+          pruebas, errores, salidas = {}, {}, {}
           with open("resultado-pruebas.json", encoding="utf-8") as f:
               for linea in f:
                   try:
@@ -108,9 +108,12 @@ jobs:
                       pruebas[e["test"]["id"]] = e["test"]["name"]
                   elif e.get("type") == "error":
                       errores.setdefault(e["testID"], e["error"])
+                  elif e.get("type") == "print":
+                      salidas.setdefault(e["testID"], []).append(e["message"])
           for id_, error in errores.items():
-              mensaje = " | ".join(error.strip().splitlines()[:6]).replace("%", "%25")
-              print(f"::error title=Prueba fallida: {pruebas.get(id_, id_)}::{mensaje}")
+              lineas = [l.strip() for l in "\n".join(salidas.get(id_, [])).splitlines() if l.strip() and "═" not in l]
+              detalle = " | ".join(lineas[:14]) or error.strip().splitlines()[0]
+              print(f"::error title=Prueba fallida: {pruebas.get(id_, id_)}::{detalle.replace('%', '%25')}")
           PY
 
       - name: Compilar versión web
