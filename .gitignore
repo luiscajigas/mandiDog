@@ -20,11 +20,10 @@ venv/
 .env
 
 # Datos y modelos (no se versionan)
-data/
-models/
-ml/data/
-ml/models/
-api/models/
+/ml/data/
+/ml/models/
+/ml/metrics.json
+/api/models/
 *.keras
 *.h5
 
