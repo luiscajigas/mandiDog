@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:flutter_litert/flutter_litert.dart';
 
 import '../../domain/errores.dart';
 import 'motor_inferencia.dart';

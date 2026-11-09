@@ -35,7 +35,7 @@ Este documento describe la arquitectura del prototipo con el modelo C4 (Contexto
 | Contenedor | Tecnología | Responsabilidad |
 |------------|------------|-----------------|
 | **App móvil** | Flutter (Dart), Android y web | Captura con marco de encuadre, análisis en el teléfono (TensorFlow Lite) o envío a la API, presentación del semáforo, historial local. El mismo código se compila como APK y como aplicación web para iPhone |
-| **Modelo en el teléfono** | TensorFlow Lite (`tflite_flutter`) | `assets/modelo/mandidog.tflite` y `modelo.json` (versión y umbrales), generados con `ml/exportar_tflite.py` |
+| **Modelo en el teléfono** | TensorFlow Lite (`flutter_litert`, LiteRT) | `assets/modelo/mandidog.tflite` y `modelo.json` (versión y umbrales), generados con `ml/exportar_tflite.py` |
 | **Almacenamiento local** | SharedPreferences (JSON; en web, almacenamiento local del navegador) | Historial de análisis con una miniatura de cada foto, solo en el dispositivo |
 | **API de análisis** | Python 3.11, FastAPI, Uvicorn, Docker | Validar la imagen, ejecutar la inferencia, traducir la probabilidad a nivel de riesgo |
 | **Modelo** | Archivo Keras (`mandidog_v1.keras`) | Red convolucional MobileNetV2 con clasificador binario |
