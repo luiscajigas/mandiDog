@@ -5,11 +5,12 @@ import 'colores.dart';
 
 const radioTarjeta = 20.0;
 
-ThemeData temaClaro() => _construir(Brightness.light);
+/// [poppins] en false usa la fuente del sistema (útil en pruebas, donde no se cargan fuentes).
+ThemeData temaClaro({bool poppins = true}) => _construir(Brightness.light, poppins);
 
-ThemeData temaOscuro() => _construir(Brightness.dark);
+ThemeData temaOscuro({bool poppins = true}) => _construir(Brightness.dark, poppins);
 
-ThemeData _construir(Brightness brillo) {
+ThemeData _construir(Brightness brillo, bool poppins) {
   final oscuro = brillo == Brightness.dark;
   final esquema = ColorScheme.fromSeed(
     seedColor: ColoresMandiDog.petroleo,
@@ -22,7 +23,7 @@ ThemeData _construir(Brightness brillo) {
   );
 
   final base = ThemeData(useMaterial3: true, colorScheme: esquema, brightness: brillo);
-  final texto = GoogleFonts.poppinsTextTheme(base.textTheme).apply(
+  final texto = (poppins ? GoogleFonts.poppinsTextTheme(base.textTheme) : base.textTheme).apply(
     bodyColor: oscuro ? const Color(0xFFE6EEF0) : ColoresMandiDog.tinta,
     displayColor: oscuro ? Colors.white : ColoresMandiDog.tinta,
   );

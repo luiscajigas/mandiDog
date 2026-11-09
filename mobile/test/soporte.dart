@@ -108,6 +108,7 @@ Widget envolver(
       Provider<HistorialRepository>.value(value: historial ?? HistorialEnMemoria()),
       ChangeNotifierProvider(create: (_) => ControladorTema(prefs)),
     ],
-    child: MaterialApp(theme: temaClaro(), home: pantalla),
+    // Sin Poppins: las pruebas no evalúan tipografía y así no dependen de cargar fuentes.
+    child: MaterialApp(theme: temaClaro(poppins: false), home: pantalla),
   );
 }
