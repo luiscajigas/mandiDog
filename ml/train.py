@@ -65,24 +65,46 @@ def listar_imagenes(carpeta_datos: Path) -> tuple[list[str], list[int]]:
     return rutas, etiquetas
 
 
+def grupo_de(ruta: str) -> str:
+    """Foto original a la que pertenece una imagen.
+
+    Roboflow guarda copias aumentadas como '<original>.rf.<hash>.jpg'; todas pertenecen al mismo grupo.
+    """
+    return Path(ruta).name.split(".rf.")[0]
+
+
 def dividir_estratificado(rutas, etiquetas, prop_prueba, prop_val, semilla):
-    """Divide en entrenamiento, validación y prueba conservando la proporción de cada clase."""
+    """Divide en entrenamiento, validación y prueba conservando la proporción de cada clase.
+
+    Se divide por foto original (grupo), no por imagen: las copias de una misma foto nunca quedan
+    repartidas entre entrenamiento y prueba. En validación y prueba se usa una sola imagen por foto
+    original, para que las métricas cuenten fotos distintas.
+    """
     generador = np.random.default_rng(semilla)
     conjuntos = {"entrenamiento": ([], []), "validacion": ([], []), "prueba": ([], [])}
-    etiquetas_np = np.array(etiquetas)
-    for clase in np.unique(etiquetas_np):
-        indices = np.where(etiquetas_np == clase)[0]
-        generador.shuffle(indices)
-        n_prueba = max(1, int(round(len(indices) * prop_prueba)))
-        n_val = max(1, int(round(len(indices) * prop_val)))
+
+    grupos: dict[tuple[int, str], list[str]] = {}
+    for ruta, etiqueta in zip(rutas, etiquetas):
+        grupos.setdefault((int(etiqueta), grupo_de(ruta)), []).append(ruta)
+
+    for clase in sorted({clase for clase, _ in grupos}):
+        claves = sorted(clave for clave in grupos if clave[0] == clase)
+        orden = generador.permutation(len(claves))
+        claves = [claves[i] for i in orden]
+        n_prueba = max(1, int(round(len(claves) * prop_prueba)))
+        n_val = max(1, int(round(len(claves) * prop_val)))
         cortes = {
-            "prueba": indices[:n_prueba],
-            "validacion": indices[n_prueba : n_prueba + n_val],
-            "entrenamiento": indices[n_prueba + n_val :],
+            "prueba": claves[:n_prueba],
+            "validacion": claves[n_prueba : n_prueba + n_val],
+            "entrenamiento": claves[n_prueba + n_val :],
         }
-        for nombre, idx in cortes.items():
-            conjuntos[nombre][0].extend(rutas[i] for i in idx)
-            conjuntos[nombre][1].extend(int(etiquetas[i]) for i in idx)
+        for nombre, seleccion in cortes.items():
+            for clave in seleccion:
+                imagenes = sorted(grupos[clave])
+                if nombre != "entrenamiento":
+                    imagenes = imagenes[:1]
+                conjuntos[nombre][0].extend(imagenes)
+                conjuntos[nombre][1].extend([clase] * len(imagenes))
     return conjuntos
 
 
@@ -171,30 +193,21 @@ def calcular_metricas(y_real: np.ndarray, y_prob: np.ndarray, umbral: float = 0.
     }
 
 
-def entrenar(args: argparse.Namespace) -> dict:
-    """Ejecuta todo el proceso y devuelve las métricas sobre el conjunto de prueba."""
-    fijar_semillas(args.semilla)
-
-    print("Leyendo imágenes...")
-    rutas, etiquetas = listar_imagenes(args.data)
-    conjuntos = dividir_estratificado(rutas, etiquetas, args.prueba, args.validacion, args.semilla)
-    for nombre, (r, _) in conjuntos.items():
-        print(f"  {nombre}: {len(r)} imágenes")
-
-    ds_entrenamiento = crear_dataset(*conjuntos["entrenamiento"], args.lote, True, args.semilla)
-    ds_validacion = crear_dataset(*conjuntos["validacion"], args.lote, False, args.semilla)
-    ds_prueba = crear_dataset(*conjuntos["prueba"], args.lote, False, args.semilla)
+def ajustar_modelo(entrenamiento, validacion, args: argparse.Namespace, detalle: int = 1) -> tf.keras.Model:
+    """Entrena un modelo nuevo en dos fases (base congelada y ajuste fino) y lo devuelve."""
+    ds_entrenamiento = crear_dataset(*entrenamiento, args.lote, True, args.semilla)
+    ds_validacion = crear_dataset(*validacion, args.lote, False, args.semilla)
 
     modelo, base = construir_modelo()
-    pesos = pesos_de_clase(conjuntos["entrenamiento"][1])
+    pesos = pesos_de_clase(entrenamiento[1])
     parada = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
 
     print("\nFase 1: base congelada")
     compilar(modelo, 1e-3)
     modelo.fit(ds_entrenamiento, validation_data=ds_validacion, epochs=args.epocas_base,
-               class_weight=pesos, callbacks=[parada])
+               class_weight=pesos, callbacks=[parada], verbose=detalle)
 
-    print(f"\nFase 2: ajuste fino de las últimas {args.capas_ajuste} capas")
+    print(f"Fase 2: ajuste fino de las últimas {args.capas_ajuste} capas")
     base.trainable = True
     for capa in base.layers[: -args.capas_ajuste]:
         capa.trainable = False
@@ -203,7 +216,22 @@ def entrenar(args: argparse.Namespace) -> dict:
             capa.trainable = False  # mantiene estables las estadísticas de ImageNet
     compilar(modelo, 1e-5)
     modelo.fit(ds_entrenamiento, validation_data=ds_validacion, epochs=args.epocas_ajuste,
-               class_weight=pesos, callbacks=[parada])
+               class_weight=pesos, callbacks=[parada], verbose=detalle)
+    return modelo
+
+
+def entrenar(args: argparse.Namespace) -> dict:
+    """Ejecuta todo el proceso y devuelve las métricas sobre el conjunto de prueba."""
+    fijar_semillas(args.semilla)
+
+    print("Leyendo imágenes...")
+    rutas, etiquetas = listar_imagenes(args.data)
+    conjuntos = dividir_estratificado(rutas, etiquetas, args.prueba, args.validacion, args.semilla)
+    for nombre, (r, _) in conjuntos.items():
+        print(f"  {nombre}: {len(r)} imágenes de {len({grupo_de(x) for x in r})} fotos originales")
+
+    modelo = ajustar_modelo(conjuntos["entrenamiento"], conjuntos["validacion"], args)
+    ds_prueba = crear_dataset(*conjuntos["prueba"], args.lote, False, args.semilla)
 
     print("\nEvaluando en el conjunto de prueba...")
     y_prob = modelo.predict(ds_prueba, verbose=0).reshape(-1)
@@ -216,6 +244,7 @@ def entrenar(args: argparse.Namespace) -> dict:
             "clases": CLASES,
             "fecha": datetime.now(timezone.utc).isoformat(),
             "tamano_conjuntos": {k: len(v[0]) for k, v in conjuntos.items()},
+            "fotos_originales": {k: len({grupo_de(x) for x in v[0]}) for k, v in conjuntos.items()},
         }
     )
 
