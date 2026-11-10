@@ -43,3 +43,6 @@ mobile/android/app/release/
 mobile/android/key.properties
 mobile/android/**/gradle-wrapper.jar
 *.jks
+/ml/*.zip
+/ml/metrics_cv.json
+/ml/predicciones_cv.csv

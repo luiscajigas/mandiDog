@@ -41,5 +41,5 @@ abstract final class ConfiguracionApp {
   static const programa = 'Ingeniería de Software';
   static const ciudad = 'San Juan de Pasto';
   static const anio = '2026';
-  static const version = '1.2.1';
+  static const version = '1.3.0';
 }

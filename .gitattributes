@@ -5,3 +5,4 @@
 *.jpeg binary
 *.keras binary
 *.jar binary
+*.tflite binary
