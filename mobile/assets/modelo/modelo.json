@@ -1,0 +1,7 @@
+{
+  "version": "mandidog_v1",
+  "umbral_amarillo": 0.3,
+  "umbral_rojo": 0.6,
+  "cuantizado": false,
+  "fecha": "2026-11-10T20:04:19.866400+00:00"
+}
