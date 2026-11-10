@@ -13,7 +13,10 @@ La salida del modelo es la **probabilidad de la clase `con_signos`**. La API la 
 
 | Archivo              | Descripción                                                        |
 |----------------------|--------------------------------------------------------------------|
+| `preparar_roboflow.py` | Organiza el dataset "dog dental" de Roboflow (COCO) en `con_signos/` y `sin_signos/` |
 | `train.py`           | Entrenamiento local con TensorFlow/Keras                           |
+| `validacion_cruzada.py` | Validación cruzada por foto original, reparto en el semáforo y umbrales sugeridos |
+| `exportar_tflite.py` | Convierte el modelo a TensorFlow Lite para la app                  |
 | `train_colab.ipynb`  | Versión equivalente para Google Colab (con GPU gratuita)           |
 | `requirements.txt`   | Dependencias del entrenamiento                                      |
 
@@ -43,10 +46,23 @@ Use **solo imágenes de la boca de perros**. Elimine duplicados y fotos borrosas
 
 ### Fuente 1: dataset público "dog dental" (Roboflow Universe)
 
+Es el dataset con el que se entrenó el modelo incluido en la app (resultados en [docs/resultados_modelo.md](../docs/resultados_modelo.md)).
+
 1. Cree una cuenta gratuita en <https://roboflow.com> y abra el dataset: <https://universe.roboflow.com/moriahai/dog-dental>.
-2. Revise en la página el tipo de anotación y las clases del dataset.
-3. Pulse **Download Dataset**. Si el dataset ofrece el formato de clasificación **Folder Structure**, elíjalo; si es de detección de objetos, descargue cualquier formato (por ejemplo, *COCO*) y use solo las imágenes.
-4. Clasifique cada imagen en `data/con_signos/` o `data/sin_signos/` según sus etiquetas o, si el dataset no trae la clase binaria, con la revisión de un médico veterinario.
+2. Elija la versión **v4 "tartar divided into stages"** → **Download Dataset** → formato **COCO JSON** → *Download zip to computer*.
+3. Descomprima el ZIP en `ml/data/roboflow_v4/` y organice las fotos en las dos clases:
+
+   ```bash
+   python preparar_roboflow.py --origen data/roboflow_v4 --destino data
+   ```
+
+   El dataset marca el sarro por etapas (1 a 4). Las fotos sin sarro o con sarro leve (etapa 1) van a `sin_signos`
+   y las de etapas 2 a 4 a `con_signos` (`--corte` cambia ese límite). La foto con sarro sin etapa se excluye.
+   El script deja un `data/manifiesto.csv` con la etapa y la clase de cada imagen.
+
+Roboflow incluye tres copias aumentadas de cada foto de entrenamiento (`<original>.rf.<hash>.jpg`). `train.py` y
+`validacion_cruzada.py` agrupan esas copias por foto original para que nunca queden repartidas entre entrenamiento
+y prueba.
 
 También puede descargarlo desde Python con su clave de API:
 
@@ -122,7 +138,21 @@ python exportar_tflite.py --modelo models/mandidog_v1.keras --umbral-amarillo 0.
 
 El script compara el modelo convertido con el original y muestra la diferencia máxima.
 Después se suben los dos archivos al repositorio: GitHub Actions compila el APK con el modelo incluido.
-Mientras la carpeta no tenga un modelo, la app funciona en modo demostración.
+Si la carpeta no tiene un modelo, la app funciona en modo demostración.
+
+## Validación cruzada
+
+Con pocos datos, el conjunto de prueba de `train.py` tiene muy pocas fotos. `validacion_cruzada.py` entrena k
+modelos (5 por defecto) y evalúa cada foto original una vez con un modelo que no la vio:
+
+```bash
+python validacion_cruzada.py --data data --pliegues 5
+```
+
+Genera `metrics_cv.json` (métricas globales, AUC, exactitud por pliegue, reparto de cada clase en el semáforo y
+umbrales sugeridos) y `predicciones_cv.csv` (probabilidad de cada foto). Los umbrales sugeridos buscan que casi
+ningún perro con signos quede en VERDE (`--sensibilidad-objetivo`) y casi ninguno sin signos en ROJO
+(`--especificidad-objetivo`); conviene revisarlos antes de cambiar `modelo.json`.
 
 ## Usar el modelo en la API
 

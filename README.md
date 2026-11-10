@@ -53,7 +53,7 @@ docs/     Documentación (arquitectura y API)
 └──────────────┘   nivel + aviso      └─────────────────────┘
 ```
 
-Más detalle en [docs/arquitectura.md](docs/arquitectura.md) y [docs/api.md](docs/api.md).
+Más detalle en [docs/arquitectura.md](docs/arquitectura.md), [docs/api.md](docs/api.md) y [docs/resultados_modelo.md](docs/resultados_modelo.md).
 
 ## Ejecutar la API
 
@@ -95,6 +95,16 @@ flutter run --dart-define=ANALISIS_EN_SERVIDOR=true --dart-define=API_URL=http:/
 ```
 
 El modelo que usa la app está en `mobile/assets/modelo/` (`mandidog.tflite` y `modelo.json`); se genera con `ml/train.py` o `ml/exportar_tflite.py`. Si la carpeta no tiene modelo, la app funciona en **modo demostración**.
+
+## Modelo entrenado
+
+La app incluye el modelo `mandidog_v1`, entrenado con las 62 fotos utilizables del dataset público "dog dental"
+(Roboflow Universe, CC BY 4.0), que marca el sarro dental por etapas. En validación cruzada de 5 pliegues obtuvo
+una exactitud de 0,87, sensibilidad de 0,88, especificidad de 0,86 y AUC de 0,93. Con los umbrales 0,30 y 0,60,
+solo 1 de 34 perros con signos quedó en VERDE.
+
+Son resultados de un **prototipo**: pocas fotos, una sola fuente, solo sarro y sin validación veterinaria propia.
+El detalle, las limitaciones y cómo reproducirlos están en [docs/resultados_modelo.md](docs/resultados_modelo.md).
 
 - Análisis estático: `flutter analyze`
 - Pruebas: `flutter test`
